@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "uv_bump"
+name = "uv-bump"
 version = "0.1.0"
