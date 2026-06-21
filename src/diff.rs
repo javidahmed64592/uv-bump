@@ -3,8 +3,18 @@ use uv_bump::DependencyChange;
 
 pub fn print_diff(changes: &[DependencyChange]) {
     for change in changes {
-        println!("- {:<16} {}", change.name.bold(), change.old.red());
-        println!("+ {:<16} {}", change.name.bold(), change.new.bright_green());
+        println!(
+            "{} {:<16} {}",
+            "-".red(),
+            change.name.bold(),
+            change.old.red()
+        );
+        println!(
+            "{} {:<16} {}",
+            "+".bright_green(),
+            change.name.bold(),
+            change.new.bright_green()
+        );
         println!();
     }
 
