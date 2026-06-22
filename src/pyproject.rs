@@ -5,27 +5,6 @@ use toml::Value;
 
 use uv_bump::Dependency;
 
-/// Normalise a package name per PEP 503:
-/// lowercase and collapse runs of [-_.] into a single '-'.
-pub fn normalize_name(name: &str) -> String {
-    let lower = name.to_lowercase();
-    // Replace any run of [-_.] with a single '-'
-    let mut result = String::with_capacity(lower.len());
-    let mut prev_was_sep = false;
-    for ch in lower.chars() {
-        if ch == '-' || ch == '_' || ch == '.' {
-            if !prev_was_sep {
-                result.push('-');
-            }
-            prev_was_sep = true;
-        } else {
-            result.push(ch);
-            prev_was_sep = false;
-        }
-    }
-    result
-}
-
 /// Parse a single PEP 508 dependency string into a `Dependency`.
 ///
 /// PEP 508 grammar (simplified, covering the common cases):
@@ -76,7 +55,7 @@ pub fn parse_pep508(spec: &str, group: Option<String>) -> Option<Dependency> {
     if raw_name.is_empty() {
         return None;
     }
-    let name = normalize_name(raw_name);
+    let name = uv_bump::normalize_name(raw_name);
 
     // Everything after the name (and optional extras) is the version specifier.
     let rest = spec[name_end..].trim();
@@ -174,29 +153,6 @@ pub fn read_dependencies(path: &Path) -> Result<Vec<Dependency>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // ── normalize_name ───────────────────────────────────────────────────────
-
-    #[test]
-    fn test_normalize_basic() {
-        assert_eq!(normalize_name("requests"), "requests");
-    }
-
-    #[test]
-    fn test_normalize_underscores() {
-        assert_eq!(normalize_name("my_package"), "my-package");
-    }
-
-    #[test]
-    fn test_normalize_dots_and_dashes() {
-        assert_eq!(normalize_name("My.Cool-Package"), "my-cool-package");
-    }
-
-    #[test]
-    fn test_normalize_consecutive_separators() {
-        // PEP 503: runs of [-_.] collapse to a single '-'
-        assert_eq!(normalize_name("weird___name"), "weird-name");
-    }
 
     // ── parse_pep508 ─────────────────────────────────────────────────────────
 
