@@ -2,9 +2,9 @@ use anyhow::{Context, Result};
 use std::path::Path;
 use toml::Value;
 
-use uv_bump::LockVersion;
+use uv_bump::LockDependency;
 
-pub fn read_lock_versions(path: &Path) -> Result<Vec<LockVersion>> {
+pub fn read_lock_versions(path: &Path) -> Result<Vec<LockDependency>> {
     let raw = std::fs::read_to_string(path)
         .with_context(|| format!("Failed to read {}", path.display()))?;
 
@@ -22,7 +22,7 @@ pub fn read_lock_versions(path: &Path) -> Result<Vec<LockVersion>> {
             let name = pkg.get("name")?.as_str()?.to_string();
             let normalised_name = uv_bump::normalize_name(&name);
             let version = pkg.get("version")?.as_str()?.to_string();
-            Some(LockVersion {
+            Some(LockDependency {
                 name: name,
                 normalised_name: normalised_name,
                 version: version,

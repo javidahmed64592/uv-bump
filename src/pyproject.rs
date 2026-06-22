@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use std::path::Path;
 use toml::Value;
 
-use uv_bump::Dependency;
+use uv_bump::PyprojectDependency;
 
-/// Parse a single PEP 508 dependency string into a `Dependency`.
+/// Parse a single PEP 508 dependency string into a `PyprojectDependency`.
 ///
 /// PEP 508 grammar (simplified, covering the common cases):
 ///   name [extras] [version_spec] [; marker]
@@ -22,7 +22,7 @@ use uv_bump::Dependency;
 ///   - name  : everything up to the first '[', '>', '<', '=', '~', '!', ';', or whitespace
 ///   - constraint : the version specifier(s), excluding markers
 ///   - extras are intentionally discarded (not relevant to version bumping)
-pub fn parse_pep508(spec: &str, group: Option<String>) -> Option<Dependency> {
+pub fn parse_pep508(spec: &str, group: Option<String>) -> Option<PyprojectDependency> {
     let spec = spec.trim();
     if spec.is_empty() {
         return None;
@@ -73,7 +73,7 @@ pub fn parse_pep508(spec: &str, group: Option<String>) -> Option<Dependency> {
     // What remains (possibly empty) is the version constraint, e.g. ">=0.110.0" or ">=0.24,<1.0"
     let constraint = rest.to_string();
 
-    Some(Dependency {
+    Some(PyprojectDependency {
         name: raw_name.to_string(),
         normalised_name: normalised_name,
         constraint: constraint,
@@ -87,14 +87,14 @@ pub fn parse_pep508(spec: &str, group: Option<String>) -> Option<Dependency> {
 ///   [project.dependencies]              → group = None
 ///   [project.optional-dependencies]     → group = Some("<extra-name>")
 ///   [dependency-groups]                 → group = Some("<group-name>")   (PEP 735 / uv)
-pub fn read_dependencies(path: &Path) -> Result<Vec<Dependency>> {
+pub fn read_dependencies(path: &Path) -> Result<Vec<PyprojectDependency>> {
     let raw = std::fs::read_to_string(path)
         .with_context(|| format!("Failed to read {}", path.display()))?;
 
     let doc: Value = toml::from_str(&raw)
         .with_context(|| format!("Failed to parse TOML in {}", path.display()))?;
 
-    let mut deps: Vec<Dependency> = Vec::new();
+    let mut deps: Vec<PyprojectDependency> = Vec::new();
 
     // ── [project.dependencies] ──────────────────────────────────────────────
     if let Some(project) = doc.get("project") {
@@ -269,7 +269,8 @@ lint = [
         let deps = read_dependencies(&path).unwrap();
 
         // Collect into a map for easy assertion
-        let map: HashMap<String, &Dependency> = deps.iter().map(|d| (d.name.clone(), d)).collect();
+        let map: HashMap<String, &PyprojectDependency> =
+            deps.iter().map(|d| (d.name.clone(), d)).collect();
 
         assert_eq!(map["requests"].constraint, ">=2.28");
         assert_eq!(map["fastapi"].constraint, ">=0.110.0");

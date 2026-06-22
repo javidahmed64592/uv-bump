@@ -1,4 +1,4 @@
-pub struct Dependency {
+pub struct PyprojectDependency {
     /// The name of the dependency as written by the user.
     pub name: String,
     /// The normalised name of the dependency (per PEP 503).
@@ -9,7 +9,7 @@ pub struct Dependency {
     pub group: Option<String>,
 }
 
-pub struct LockVersion {
+pub struct LockDependency {
     /// The name of the dependency as written by uv.
     pub name: String,
     /// The normalised name of the dependency (per PEP 503).
