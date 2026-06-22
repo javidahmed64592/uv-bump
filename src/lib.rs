@@ -1,13 +1,10 @@
 pub struct Dependency {
     /// The name of the dependency as written by the user.
     pub name: String,
-
     /// The normalised name of the dependency (per PEP 503).
     pub normalised_name: String,
-
-    /// The version constraint of the dependency i.e. >=, <=, ==, etc.
+    /// The version constraint of the dependency i.e. >=0.1.0, <=0.1.3, ==0.1.2, etc.
     pub constraint: String,
-
     /// The group of the dependency, if any.
     pub group: Option<String>,
 }
@@ -15,10 +12,8 @@ pub struct Dependency {
 pub struct LockVersion {
     /// The name of the dependency as written by uv.
     pub name: String,
-
     /// The normalised name of the dependency (per PEP 503).
     pub normalised_name: String,
-
     /// The version of the dependency.
     pub version: String,
 }
