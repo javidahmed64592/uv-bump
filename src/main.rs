@@ -17,19 +17,6 @@ use uv_bump::{compute_dependency_changes, map_dependencies};
 const PYPROJECT_FILENAME: &str = "pyproject.toml";
 const LOCKFILE_FILENAME: &str = "uv.lock";
 
-fn get_diff(
-    pyproject_path: &Path,
-    lockfile_path: &Path,
-) -> anyhow::Result<Vec<uv_bump::DependencyChange>> {
-    let dependencies = read_dependencies(pyproject_path)?;
-    let lock_versions = read_lock_versions(lockfile_path)?;
-
-    let mapped_dependencies = map_dependencies(&dependencies, &lock_versions);
-    let changes = compute_dependency_changes(&mapped_dependencies);
-
-    Ok(changes)
-}
-
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
@@ -106,7 +93,12 @@ fn main() -> anyhow::Result<()> {
     }
 
     // Compute and print the diff of dependency changes
-    let diff = get_diff(&pyproject_path, &lockfile_path)?;
+    let dependencies = read_dependencies(pyproject_path)?;
+    let lock_versions = read_lock_versions(lockfile_path)?;
+
+    let mapped_dependencies = map_dependencies(&dependencies, &lock_versions);
+    let diff = compute_dependency_changes(&mapped_dependencies);
+
     print_diff(&diff);
 
     // If the check flag is set, exit after printing the diff
