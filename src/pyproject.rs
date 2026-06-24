@@ -12,6 +12,12 @@ fn parse_constraint(s: &str) -> (Option<String>, Option<String>, Option<String>)
     // Operator: one of >=, <=, ==, ~=, !=, >,
     let op_end = s.find(|c: char| c.is_ascii_digit()).unwrap_or(s.len());
     let operator = s[..op_end].to_string();
+
+    // ~= semantics are complex and bumping them changes meaning, not just version
+    if operator == "~=" {
+        return (Some(operator), None, None);
+    }
+
     let rest = &s[op_end..];
 
     // Version: up to the next comma (start of suffix) or end of string
