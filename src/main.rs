@@ -1,4 +1,4 @@
-//! Update pyproject.toml dependency constraints using versions resolved by uv, with preview and interactive apply support.
+//! Update dependencies in `pyproject.toml` using versions resolved by `uv`
 
 mod cli;
 mod diff;
@@ -23,7 +23,6 @@ fn main() -> anyhow::Result<()> {
     let root_path = cli.path.clone();
     let check_flag = cli.check;
     let yes_flag = cli.yes;
-    let interactive_flag = cli.interactive;
     let upgrade_flag = cli.upgrade;
 
     // Ensure check and yes flags are not both specified
@@ -33,17 +32,6 @@ fn main() -> anyhow::Result<()> {
             "✖".bright_red(),
             "--check".bright_green(),
             "--yes".bright_green()
-        );
-        std::process::exit(1);
-    }
-
-    // Ensure yes and interactive flags are not both specified
-    if yes_flag && interactive_flag {
-        eprintln!(
-            "{} The {} and {} flags cannot be used together.",
-            "✖".bright_red(),
-            "--yes".bright_green(),
-            "--interactive".bright_green()
         );
         std::process::exit(1);
     }
@@ -112,5 +100,5 @@ fn main() -> anyhow::Result<()> {
     }
 
     // TODO: Apply changes
-    todo!("Implement apply functionality with --yes and --interactive flags");
+    todo!("Implement apply functionality with --yes flag");
 }

@@ -22,10 +22,6 @@ pub struct Cli {
     #[arg(short = 'y', long)]
     pub yes: bool,
 
-    /// Prompt interactively for each change
-    #[arg(short = 'i', long)]
-    pub interactive: bool,
-
     /// Upgrade dependencies in `uv.lock` with `uv`
     #[arg(short = 'u', long = "upgrade")]
     pub upgrade: bool,
