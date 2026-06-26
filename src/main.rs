@@ -135,10 +135,10 @@ fn main() -> anyhow::Result<()> {
 
         terminal::enable_raw_mode()?;
         let confirmed = loop {
-            if let Event::Key(key) = event::read()? {
-                if key.kind == KeyEventKind::Press {
-                    break matches!(key.code, KeyCode::Char('y') | KeyCode::Char('Y'));
-                }
+            if let Event::Key(key) = event::read()?
+                && key.kind == KeyEventKind::Press
+            {
+                break matches!(key.code, KeyCode::Char('y') | KeyCode::Char('Y'));
             }
         };
         terminal::disable_raw_mode()?;
@@ -159,5 +159,5 @@ fn main() -> anyhow::Result<()> {
     println!("Applying changes...");
     apply_changes(pyproject_path, &diff, &dependencies)?;
     println!("{}", get_success_msg("Changes applied successfully!"));
-    return Ok(());
+    Ok(())
 }
