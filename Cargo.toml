@@ -11,6 +11,7 @@ clap = { version = "4.6.1", features = ["derive"] }
 owo-colors = "4.3.0"
 tempfile = "3.27.0"
 toml = "1.1.2"
+toml_edit = "0.25.12"
 
 [profile.dist]
 inherits = "release"

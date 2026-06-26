@@ -5,6 +5,10 @@ pub fn get_success_msg(msg: &str) -> String {
     format!("{} {}", "✔".bright_green(), msg)
 }
 
+pub fn get_warning_msg(msg: &str) -> String {
+    format!("{} {}", "⚠".bright_yellow(), msg)
+}
+
 pub fn get_error_msg(msg: &str) -> String {
     format!("{} {}", "✖".bright_red(), msg)
 }
@@ -54,6 +58,8 @@ pub struct DependencyChange {
     pub old: String,
     /// The new version number of the dependency.
     pub new: String,
+    /// The suffix of the dependency, if any (",<1.0" or ",!=1.0.0").
+    pub suffix: Option<String>,
 }
 
 // Dependency parsing
@@ -112,16 +118,9 @@ pub fn compute_dependency_changes(mapped_deps: &[MappedDependency]) -> Vec<Depen
             let change = DependencyChange {
                 name: mapped.pyproject.name.clone(),
                 operator: mapped.pyproject.operator.clone(),
-                old: format!(
-                    "{}{}",
-                    pyproject_version,
-                    mapped.pyproject.suffix.clone().unwrap_or_default()
-                ),
-                new: format!(
-                    "{}{}",
-                    mapped.lock.version,
-                    mapped.pyproject.suffix.clone().unwrap_or_default()
-                ),
+                old: pyproject_version.clone(),
+                new: mapped.lock.version.clone(),
+                suffix: mapped.pyproject.suffix.clone(),
             };
             changes.push(change);
         }

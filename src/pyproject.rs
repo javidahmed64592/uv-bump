@@ -2,31 +2,48 @@ use anyhow::{Context, Result};
 use owo_colors::OwoColorize;
 use std::path::Path;
 use toml::Value;
+use toml_edit::{DocumentMut, Item};
 
-use uv_bump::{PyprojectDependency, get_error_msg};
+use uv_bump::{DependencyChange, PyprojectDependency, get_error_msg};
 
-/// Parse a single version constraint string into its components: operator, version, and optional suffix.
+// ─── Parsing ─────────────────────────────────────────────────────────────────
+
+/// Parse a single version constraint string into its components.
+///
+/// Returns `(operator, version, suffix)`, where:
+///   - `operator` is the leading specifier token e.g. `>=`, `==`
+///   - `version`  is the lower-bound version number e.g. `0.110.0`
+///   - `suffix`   is any trailing specifiers e.g. `,<1.0`
+///
+/// Returns `(None, None, None)` for:
+///   - empty strings
+///   - URL/git dependencies (`@ git+...`)
+///   - compatible-release constraints (`~=`), which are skipped because bumping
+///     them changes their semantics, not just their version number
 fn parse_constraint(s: &str) -> (Option<String>, Option<String>, Option<String>) {
     if s.is_empty() || s.starts_with('@') {
         return (None, None, None);
     }
 
-    // Operator: one of >=, <=, ==, ~=, !=, >,
+    // Operator: one of >=, <=, ==, ~=, !=, >, <
     let op_end = s.find(|c: char| c.is_ascii_digit()).unwrap_or(s.len());
     let operator = s[..op_end].to_string();
 
-    // ~= semantics are complex and bumping them changes meaning, not just version
+    // ~= semantics are complex and bumping them changes meaning, not just version.
+    // Leave these for the user to update manually.
     if operator == "~=" {
         return (Some(operator), None, None);
     }
 
     let rest = &s[op_end..];
 
-    // Version: up to the next comma (start of suffix) or end of string
+    // Version: everything up to the next comma (start of suffix) or end of string
     let version_end = rest.find(',').unwrap_or(rest.len());
     let version = rest[..version_end].trim().to_string();
+
+    // Suffix: any trailing specifiers e.g. ",<1.0" — preserved verbatim on write-back
     let suffix = if version_end < rest.len() {
-        Some(rest[version_end..].to_string()) // e.g. ",<1.0"
+        Some(rest[version_end..].to_string())
     } else {
         None
     };
@@ -34,30 +51,33 @@ fn parse_constraint(s: &str) -> (Option<String>, Option<String>, Option<String>)
     (Some(operator), Some(version), suffix)
 }
 
-/// Parse a single PEP 508 dependency string into a `PyprojectDependency`.
+/// Parse a single PEP 508 dependency string into a [`PyprojectDependency`].
 ///
-/// PEP 508 grammar (simplified, covering the common cases):
-///   name [extras] [version_spec] [; marker]
+/// Handles the common PEP 508 grammar:
+/// ```text
+/// name [extras] [version_spec] [; marker]
+/// ```
 ///
 /// Examples:
-///   "requests"
-///   "fastapi>=0.110.0"
-///   "pydantic==2.6.1"
-///   "black[d]>=23.0"
-///   "httpx>=0.24,<1.0"
-///   "mypy>=1.0 ; python_version >= '3.11'"
+/// ```text
+/// "requests"
+/// "fastapi>=0.110.0"
+/// "pydantic==2.6.1"
+/// "black[d]>=23.0"
+/// "httpx>=0.24,<1.0"
+/// "mypy>=1.0 ; python_version >= '3.11'"
+/// ```
 ///
-/// We extract:
-///   - name  : everything up to the first '[', '>', '<', '=', '~', '!', ';', or whitespace
-///   - constraint : the version specifier(s), excluding markers
-///   - extras are intentionally discarded (not relevant to version bumping)
-pub fn parse_pep508(spec: &str, group: Option<String>) -> Option<PyprojectDependency> {
+/// Extras are discarded as they are not relevant to version bumping.
+/// Environment markers are stripped.
+/// Git/URL dependencies (`@ git+...`) produce `operator = None`, `version = None`.
+fn parse_pep508(spec: &str, group: Option<String>) -> Option<PyprojectDependency> {
     let spec = spec.trim();
     if spec.is_empty() {
         return None;
     }
 
-    // Strip inline comments (uncommon in pyproject but safe to handle)
+    // Strip inline comments (uncommon in pyproject.toml but safe to handle)
     let spec = spec.split('#').next().unwrap_or("").trim();
     if spec.is_empty() {
         return None;
@@ -66,8 +86,8 @@ pub fn parse_pep508(spec: &str, group: Option<String>) -> Option<PyprojectDepend
     // Strip environment markers: everything from ';' onward
     let spec = spec.split(';').next().unwrap_or("").trim();
 
-    // Find where the name ends. Name characters: letters, digits, '-', '_', '.'
-    // It ends at the first '[' (extras), version operator, or whitespace.
+    // Name ends at the first '[' (extras), version operator, or whitespace.
+    // Name characters are: letters, digits, '-', '_', '.'
     let name_end = spec
         .find(|c: char| {
             c == '['
@@ -86,20 +106,20 @@ pub fn parse_pep508(spec: &str, group: Option<String>) -> Option<PyprojectDepend
     }
     let normalised_name = uv_bump::normalize_name(raw_name);
 
-    // Everything after the name (and optional extras) is the version specifier.
+    // Everything after the name (and optional extras) is the version specifier
     let rest = spec[name_end..].trim();
 
-    // Skip optional extras block: [extra1,extra2]
+    // Skip optional extras block e.g. [standard], [dev,docs]
     let rest = if rest.starts_with('[') {
         match rest.find(']') {
             Some(idx) => rest[idx + 1..].trim(),
-            None => rest, // malformed but keep going
+            None => rest, // malformed extras, keep going
         }
     } else {
         rest
     };
 
-    // What remains (possibly empty) is the version constraint, e.g. ">=0.110.0" or ">=0.24,<1.0"
+    // Parse the remaining constraint string e.g. ">=0.110.0" or ">=0.24,<1.0"
     let (operator, version, suffix) = parse_constraint(rest);
 
     Some(PyprojectDependency {
@@ -112,12 +132,17 @@ pub fn parse_pep508(spec: &str, group: Option<String>) -> Option<PyprojectDepend
     })
 }
 
+// ─── Reading ─────────────────────────────────────────────────────────────────
+
 /// Read `pyproject.toml` from `path` and return all dependencies across every group.
 ///
 /// Reads from:
-///   [project.dependencies]              → group = None
-///   [project.optional-dependencies]     → group = Some("<extra-name>")
-///   [dependency-groups]                 → group = Some("<group-name>")   (PEP 735 / uv)
+///   - `[project.dependencies]`            → `group = None`
+///   - `[project.optional-dependencies]`   → `group = Some("<extra-name>")`
+///   - `[dependency-groups]`               → `group = Some("<group-name>")` (PEP 735 / uv)
+///
+/// Git/URL dependencies and bare names (no version constraint) are included with
+/// `operator = None` and `version = None`, and will be skipped during diff computation.
 pub fn read_dependencies(path: &Path) -> Result<Vec<PyprojectDependency>> {
     let raw = std::fs::read_to_string(path).with_context(|| {
         get_error_msg(&format!("Failed to read: {}", path.display().bright_blue()))
@@ -160,9 +185,9 @@ pub fn read_dependencies(path: &Path) -> Result<Vec<PyprojectDependency>> {
         }
     }
 
-    // ── [dependency-groups]  (PEP 735 — supported by uv) ───────────────────
-    // Values can be plain strings OR inline tables { include-group = "..." }.
-    // We only care about the string entries.
+    // ── [dependency-groups] (PEP 735 — supported by uv) ────────────────────
+    // Values can be plain strings OR inline tables e.g. `{ include-group = "..." }`.
+    // Only string entries are package specifiers; table entries are skipped.
     if let Some(Value::Table(dg)) = doc.get("dependency-groups") {
         for (group_name, group_value) in dg {
             if let Value::Array(arr) = group_value {
@@ -173,8 +198,7 @@ pub fn read_dependencies(path: &Path) -> Result<Vec<PyprojectDependency>> {
                                 deps.push(dep);
                             }
                         }
-                        // { include-group = "other" } — skip, not a package specifier
-                        Value::Table(_) => {}
+                        Value::Table(_) => {} // { include-group = "other" } — not a package
                         _ => {}
                     }
                 }
@@ -183,6 +207,92 @@ pub fn read_dependencies(path: &Path) -> Result<Vec<PyprojectDependency>> {
     }
 
     Ok(deps)
+}
+
+// ─── Writing ─────────────────────────────────────────────────────────────────
+
+/// Find the entry in a TOML array whose string value contains `name`, and replace
+/// it with `new_spec`, preserving the original entry's surrounding whitespace and
+/// comments via `toml_edit`'s decoration API.
+fn replace_in_array(item: &mut Item, name: &str, new_spec: &str) {
+    let Some(array) = item.as_array_mut() else {
+        return;
+    };
+
+    let Some(idx) = array
+        .iter()
+        .position(|v| v.as_str().is_some_and(|s| s.contains(name)))
+    else {
+        return;
+    };
+
+    array.replace(idx, new_spec);
+}
+
+/// Write dependency version changes back to `pyproject.toml` at `path`.
+///
+/// Uses [`toml_edit`] to perform format-preserving edits — only the version
+/// numbers are modified; all comments, whitespace, and key ordering are retained.
+///
+/// Each changed dependency is looked up in `deps` to determine its group
+/// (which TOML array to update) and to reconstruct the full PEP 508 string
+/// with the new version, preserving the original operator and any suffix
+/// constraints e.g. `,<1.0`.
+pub fn apply_changes(
+    path: &Path,
+    changes: &[DependencyChange],
+    deps: &[PyprojectDependency],
+) -> Result<()> {
+    let raw = std::fs::read_to_string(path).with_context(|| {
+        get_error_msg(&format!("Failed to read: {}", path.display().bright_blue()))
+    })?;
+
+    let mut doc: DocumentMut = raw.parse().with_context(|| {
+        get_error_msg(&format!(
+            "Failed to parse TOML in: {}",
+            path.display().bright_blue()
+        ))
+    })?;
+
+    for change in changes {
+        let Some(dep) = deps.iter().find(|d| d.name == change.name) else {
+            continue;
+        };
+
+        // Rebuild the full PEP 508 string with the updated version, preserving
+        // the original operator and any suffix constraints e.g. ",<1.0"
+        let new_spec = format!(
+            "{}{}{}{}",
+            dep.name,
+            change.operator.as_deref().unwrap_or(""),
+            change.new,
+            dep.suffix.as_deref().unwrap_or("")
+        );
+
+        match &dep.group {
+            // [project.dependencies]
+            None => {
+                replace_in_array(&mut doc["project"]["dependencies"], &dep.name, &new_spec);
+            }
+            // [project.optional-dependencies.<group>]
+            Some(group) => {
+                replace_in_array(
+                    &mut doc["project"]["optional-dependencies"][group],
+                    &dep.name,
+                    &new_spec,
+                );
+            }
+        }
+    }
+
+    std::fs::write(path, doc.to_string()).with_context(|| {
+        get_error_msg(&format!(
+            "Failed to write: {}",
+            path.display().bright_blue()
+        ))
+    })?;
+
+    Ok(())
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────

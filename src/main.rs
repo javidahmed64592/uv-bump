@@ -10,9 +10,11 @@ use cli::Cli;
 use diff::print_diff;
 use lockfile::read_lock_versions;
 use owo_colors::OwoColorize;
-use pyproject::read_dependencies;
+use pyproject::{apply_changes, read_dependencies};
 use std::path::Path;
-use uv_bump::{compute_dependency_changes, get_error_msg, get_success_msg, map_dependencies};
+use uv_bump::{
+    compute_dependency_changes, get_error_msg, get_success_msg, get_warning_msg, map_dependencies,
+};
 
 const PYPROJECT_FILENAME: &str = "pyproject.toml";
 const LOCKFILE_FILENAME: &str = "uv.lock";
@@ -101,7 +103,13 @@ fn main() -> anyhow::Result<()> {
         println!("{}", get_success_msg("Dependencies are already in sync!"));
         return Ok(());
     } else {
+        println!("{}", "Changes:\n".bold().underline());
         print_diff(&diff);
+        println!(
+            "{} dependency are out of sync in: {}",
+            diff.len().to_string().bold(),
+            PYPROJECT_FILENAME.bright_blue()
+        );
     }
 
     // If the check flag is set, exit after printing the diff
@@ -118,11 +126,23 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    // TODO: Apply changes
-    println!(
-        "Applying changes to '{}'...",
-        PYPROJECT_FILENAME.bright_blue()
-    );
+    // Confirm before applying changes
+    if !yes_flag {
+        println!(
+            "{}",
+            "Are you sure you want to apply these changes? (y/N)".bright_yellow()
+        );
+        let mut input = String::new();
+        std::io::stdin().read_line(&mut input)?;
+        let input = input.trim().to_lowercase();
+        if !input.starts_with('y') {
+            println!("{}", get_warning_msg("Aborting changes..."));
+            return Ok(());
+        }
+    }
 
-    todo!("Implement apply functionality with --yes flag");
+    println!("Applying changes...");
+    apply_changes(pyproject_path, &diff, &dependencies)?;
+    println!("{}", get_success_msg("Changes applied successfully!"));
+    return Ok(());
 }
