@@ -1,15 +1,20 @@
 use anyhow::{Context, Result};
+use owo_colors::OwoColorize;
 use std::path::Path;
 use toml::Value;
-
-use uv_bump::LockDependency;
+use uv_bump::{LockDependency, get_error_msg};
 
 pub fn read_lock_versions(path: &Path) -> Result<Vec<LockDependency>> {
-    let raw = std::fs::read_to_string(path)
-        .with_context(|| format!("Failed to read {}", path.display()))?;
+    let raw = std::fs::read_to_string(path).with_context(|| {
+        get_error_msg(&format!("Failed to read: {}", path.display().bright_blue()))
+    })?;
 
-    let doc: Value = toml::from_str(&raw)
-        .with_context(|| format!("Failed to parse TOML in {}", path.display()))?;
+    let doc: Value = toml::from_str(&raw).with_context(|| {
+        get_error_msg(&format!(
+            "Failed to parse TOML in: {}",
+            path.display().bright_blue()
+        ))
+    })?;
 
     let packages = match doc.get("package") {
         Some(Value::Array(arr)) => arr,

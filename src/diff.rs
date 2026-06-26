@@ -2,26 +2,23 @@ use owo_colors::OwoColorize;
 use uv_bump::DependencyChange;
 
 pub fn print_diff(changes: &[DependencyChange]) {
-    if changes.is_empty() {
-        println!("{} Dependencies already up to date!", "✔".bright_green());
-        return;
-    }
-
     for change in changes {
         println!(
-            "{} {:<16} {}",
-            "-".red(),
+            "{} {:<16} {}{}{}",
+            "-".bright_red(),
             change.name.bold(),
-            change.old.red()
+            change.operator.clone().unwrap_or_default().bright_red(),
+            change.old.bright_red().underline(),
+            change.suffix.clone().unwrap_or_default().bright_red(),
         );
         println!(
-            "{} {:<16} {}",
+            "{} {:<16} {}{}{}",
             "+".bright_green(),
             change.name.bold(),
-            change.new.bright_green()
+            change.operator.clone().unwrap_or_default().bright_green(),
+            change.new.bright_green().underline(),
+            change.suffix.clone().unwrap_or_default().bright_green()
         );
         println!();
     }
-
-    println!("{} dependency changes.", changes.len().to_string().bold(),);
 }
