@@ -7,6 +7,8 @@ mod pyproject;
 
 use clap::Parser;
 use cli::Cli;
+use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use crossterm::terminal;
 use diff::print_diff;
 use lockfile::read_lock_versions;
 use owo_colors::OwoColorize;
@@ -128,14 +130,27 @@ fn main() -> anyhow::Result<()> {
 
     // Confirm before applying changes
     if !yes_flag {
-        println!(
-            "{}",
-            "Are you sure you want to apply these changes? (y/N)".bright_yellow()
-        );
-        let mut input = String::new();
-        std::io::stdin().read_line(&mut input)?;
-        let input = input.trim().to_lowercase();
-        if !input.starts_with('y') {
+        print!("{}", "Apply these changes? (y/N) ".bright_yellow());
+        std::io::Write::flush(&mut std::io::stdout())?;
+
+        terminal::enable_raw_mode()?;
+        let confirmed = loop {
+            if let Event::Key(key) = event::read()? {
+                if key.kind == KeyEventKind::Press {
+                    break matches!(key.code, KeyCode::Char('y') | KeyCode::Char('Y'));
+                }
+            }
+        };
+        terminal::disable_raw_mode()?;
+
+        // Print the key the user pressed so the line feels complete
+        if confirmed {
+            println!("y");
+        } else {
+            println!("N");
+        }
+
+        if !confirmed {
             println!("{}", get_warning_msg("Aborting changes..."));
             return Ok(());
         }
