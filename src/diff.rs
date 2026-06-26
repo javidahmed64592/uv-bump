@@ -7,10 +7,10 @@ pub fn print_diff(changes: &[DependencyChange]) {
     for change in changes {
         println!(
             "{} {:<16} {}{}",
-            "-".red(),
+            "-".bright_red(),
             change.name.bold(),
-            change.operator.clone().unwrap_or_default().red(),
-            change.old.red(),
+            change.operator.clone().unwrap_or_default().bright_red(),
+            change.old.bright_red(),
         );
         println!(
             "{} {:<16} {}{}",

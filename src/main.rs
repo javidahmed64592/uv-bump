@@ -44,7 +44,7 @@ fn main() -> anyhow::Result<()> {
             "{}",
             get_error_msg(&format!(
                 "The specified path does not exist or is not a directory: {}",
-                root_path.display().blue()
+                root_path.display().bright_blue()
             ))
         );
         std::process::exit(1);
@@ -60,8 +60,8 @@ fn main() -> anyhow::Result<()> {
             "{}",
             get_error_msg(&format!(
                 "'{}' does not exist in the specified path: {}",
-                PYPROJECT_FILENAME.blue(),
-                root_path.display().blue()
+                PYPROJECT_FILENAME.bright_blue(),
+                root_path.display().bright_blue()
             ))
         );
         std::process::exit(1);
@@ -72,8 +72,8 @@ fn main() -> anyhow::Result<()> {
             "{}",
             get_error_msg(&format!(
                 "'{}' does not exist in the specified path: {}",
-                LOCKFILE_FILENAME.blue(),
-                root_path.display().blue()
+                LOCKFILE_FILENAME.bright_blue(),
+                root_path.display().bright_blue()
             ))
         );
         std::process::exit(1);
@@ -83,7 +83,7 @@ fn main() -> anyhow::Result<()> {
     if upgrade_flag {
         println!(
             "Updating dependencies in '{}' using '{}'...",
-            LOCKFILE_FILENAME.blue(),
+            LOCKFILE_FILENAME.bright_blue(),
             "uv".bright_green()
         );
         todo!("Implement uv upgrade functionality");
@@ -119,5 +119,10 @@ fn main() -> anyhow::Result<()> {
     }
 
     // TODO: Apply changes
+    println!(
+        "Applying changes to '{}'...",
+        PYPROJECT_FILENAME.bright_blue()
+    );
+
     todo!("Implement apply functionality with --yes flag");
 }
