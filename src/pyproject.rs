@@ -18,8 +18,6 @@ use uv_align::{DependencyChange, PyprojectDependency, get_error_msg};
 /// Returns `(None, None, None)` for:
 ///   - empty strings
 ///   - URL/git dependencies (`@ git+...`)
-///   - compatible-release constraints (`~=`), which are skipped because bumping
-///     them changes their semantics, not just their version number
 fn parse_constraint(s: &str) -> (Option<String>, Option<String>, Option<String>) {
     if s.is_empty() || s.starts_with('@') {
         return (None, None, None);
@@ -28,13 +26,6 @@ fn parse_constraint(s: &str) -> (Option<String>, Option<String>, Option<String>)
     // Operator: one of >=, <=, ==, ~=, !=, >, <
     let op_end = s.find(|c: char| c.is_ascii_digit()).unwrap_or(s.len());
     let operator = s[..op_end].to_string();
-
-    // ~= semantics are complex and bumping them changes meaning, not just version.
-    // Leave these for the user to update manually.
-    if operator == "~=" {
-        return (Some(operator), None, None);
-    }
-
     let rest = &s[op_end..];
 
     // Version: everything up to the next comma (start of suffix) or end of string
@@ -370,7 +361,7 @@ mod tests {
         let dep = parse_pep508("numpy~=1.24", None).unwrap();
         assert_eq!(dep.name, "numpy");
         assert_eq!(dep.operator, Some("~=".to_string()));
-        assert_eq!(dep.version, None);
+        assert_eq!(dep.version, Some("1.24".to_string()));
         assert_eq!(dep.suffix, None);
     }
 
