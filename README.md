@@ -1,8 +1,8 @@
 [![Rust](https://img.shields.io/badge/Rust-1.95.0-blue?style=flat-square&logo=rust)](https://www.rust-lang.org/)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json&style=flat-square)](https://docs.astral.sh/uv/)
-[![CI](https://img.shields.io/github/actions/workflow/status/javidahmed64592/uv-align/ci.yml?branch=main&style=flat-square&label=CI&logo=github)](https://github.com/javidahmed64592/uv-align/actions/workflows/ci.yml)
-[![Docs](https://img.shields.io/github/actions/workflow/status/javidahmed64592/uv-align/docs.yml?branch=main&style=flat-square&label=Docs&logo=github)](https://github.com/javidahmed64592/uv-align/actions/workflows/docs.yml)
-[![Publish](https://img.shields.io/github/actions/workflow/status/javidahmed64592/uv-align/publish.yml?branch=main&style=flat-square&label=Publish&logo=github)](https://github.com/javidahmed64592/uv-align/actions/workflows/publish.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/javidahmed64592/uv-align/ci.yml?style=flat-square&label=CI&logo=github)](https://github.com/javidahmed64592/uv-align/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/github/actions/workflow/status/javidahmed64592/uv-align/docs.yml?style=flat-square&label=Docs&logo=github)](https://github.com/javidahmed64592/uv-align/actions/workflows/docs.yml)
+[![Publish](https://img.shields.io/github/actions/workflow/status/javidahmed64592/uv-align/publish.yml?style=flat-square&label=Publish&logo=github)](https://github.com/javidahmed64592/uv-align/actions/workflows/publish.yml)
 [![Release](https://img.shields.io/github/actions/workflow/status/javidahmed64592/uv-align/release.yml?style=flat-square&label=Release&logo=github)](https://github.com/javidahmed64592/uv-align/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
