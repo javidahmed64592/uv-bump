@@ -1,6 +1,6 @@
 [package]
 name = "uv-align"
-version = "0.1.0"
+version = "0.1.1"
 description = "Update pyproject.toml dependency constraints using versions resolved by uv."
 edition = "2024"
 repository = "https://github.com/javidahmed64592/uv-align"
