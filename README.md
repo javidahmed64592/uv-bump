@@ -4,7 +4,7 @@
 [![Docs](https://img.shields.io/github/actions/workflow/status/javidahmed64592/uv-align/docs.yml?branch=main&style=flat-square&label=Docs&logo=github)](https://github.com/javidahmed64592/uv-align/actions/workflows/docs.yml)
 [![Publish](https://img.shields.io/github/actions/workflow/status/javidahmed64592/uv-align/publish.yml?branch=main&style=flat-square&label=Publish&logo=github)](https://github.com/javidahmed64592/uv-align/actions/workflows/publish.yml)
 [![Release](https://img.shields.io/github/actions/workflow/status/javidahmed64592/uv-align/release.yml?style=flat-square&label=Release&logo=github)](https://github.com/javidahmed64592/uv-align/actions/workflows/release.yml)
-[![License: GPLv3](https://img.shields.io/badge/License-GPLv3-yellow.svg)](https://www.gnu.org/licenses/gpl-3.0.en.html)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 <!-- omit from toc -->
 # uv-align
@@ -55,4 +55,4 @@ Options:
 
 ## License
 
-This project is licensed under the GPL License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

@@ -5,7 +5,7 @@ description = "Update pyproject.toml dependency constraints using versions resol
 edition = "2024"
 repository = "https://github.com/javidahmed64592/uv-align"
 homepage = "https://github.com/javidahmed64592/uv-align"
-license = "GPL-3.0-or-later"
+license = "MIT"
 authors = ["Javid Ahmed <javidahmed@icloud.com>"]
 
 [package.metadata.wix]
