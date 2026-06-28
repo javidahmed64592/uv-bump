@@ -41,7 +41,7 @@ fn main() -> anyhow::Result<()> {
                 "--yes".bright_green()
             ))
         );
-        std::process::exit(1);
+        std::process::exit(2);
     }
 
     // Check if the path exists and is a directory
@@ -53,7 +53,7 @@ fn main() -> anyhow::Result<()> {
                 root_path.display().bright_blue()
             ))
         );
-        std::process::exit(1);
+        std::process::exit(2);
     }
     std::env::set_current_dir(&root_path)?;
 
@@ -70,7 +70,7 @@ fn main() -> anyhow::Result<()> {
                 root_path.display().bright_blue()
             ))
         );
-        std::process::exit(1);
+        std::process::exit(2);
     }
 
     if !lockfile_path.exists() {
@@ -82,7 +82,7 @@ fn main() -> anyhow::Result<()> {
                 root_path.display().bright_blue()
             ))
         );
-        std::process::exit(1);
+        std::process::exit(2);
     }
 
     if upgrade_flag {
@@ -102,7 +102,7 @@ fn main() -> anyhow::Result<()> {
                     e.to_string().bright_red()
                 ))
             );
-            std::process::exit(1);
+            std::process::exit(127);
         }
 
         // Run `uv lock --upgrade` to update the lockfile
@@ -110,17 +110,22 @@ fn main() -> anyhow::Result<()> {
         let status = std::process::Command::new(split_command[0])
             .args(&split_command[1..])
             .status()
-            .with_context(|| get_error_msg(&format!("Failed to execute: '{}'", UPDATE_COMMAND.bright_green())))
+            .with_context(|| {
+                get_error_msg(&format!(
+                    "Failed to execute: '{}'",
+                    UPDATE_COMMAND.bright_green()
+                ))
+            })
             .unwrap_or_else(|e| {
                 eprintln!(
                     "{}",
                     get_error_msg(&format!(
-                        "Failed to execute '{}'. Ensure it is installed and available in the PATH. Error: {}",
+                        "Failed to update dependencies using '{}'. Error: {}",
                         UPDATE_COMMAND.bright_green(),
                         e.to_string().bright_red()
                     ))
                 );
-                std::process::exit(1);
+                std::process::exit(126);
             });
 
         if !status.success() {
@@ -173,7 +178,7 @@ fn main() -> anyhow::Result<()> {
                 "--check".bright_green()
             ))
         );
-        return Ok(());
+        std::process::exit(1);
     }
 
     // Confirm before applying changes
