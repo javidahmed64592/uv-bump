@@ -85,6 +85,13 @@ pub fn normalize_name(name: &str) -> String {
     result
 }
 
+/// Normalise a version string by stripping trailing `.0` components
+fn normalize_version(version: &str) -> String {
+    let parts: Vec<&str> = version.split('.').collect();
+    let trimmed = parts.iter().rev().skip_while(|&&p| p == "0").count();
+    parts[..trimmed.max(1)].join(".")
+}
+
 /// Map dependencies from pyproject.toml to uv.lock based on their normalised names.
 pub fn map_dependencies(
     pyproject_deps: &[PyprojectDependency],
@@ -112,17 +119,18 @@ pub fn compute_dependency_changes(mapped_deps: &[MappedDependency]) -> Vec<Depen
     let mut changes = Vec::new();
 
     for mapped in mapped_deps {
-        if let Some(pyproject_version) = &mapped.pyproject.version
-            && pyproject_version != &mapped.lock.version
-        {
-            let change = DependencyChange {
-                name: mapped.pyproject.name.clone(),
-                operator: mapped.pyproject.operator.clone(),
-                old: pyproject_version.clone(),
-                new: mapped.lock.version.clone(),
-                suffix: mapped.pyproject.suffix.clone(),
-            };
-            changes.push(change);
+        if let Some(pyproject_version) = &mapped.pyproject.version {
+            let lock_version = &mapped.lock.version;
+
+            if normalize_version(pyproject_version) != normalize_version(lock_version) {
+                changes.push(DependencyChange {
+                    name: mapped.pyproject.name.clone(),
+                    operator: mapped.pyproject.operator.clone(),
+                    old: pyproject_version.clone(),
+                    new: lock_version.clone(),
+                    suffix: mapped.pyproject.suffix.clone(),
+                });
+            }
         }
     }
 
