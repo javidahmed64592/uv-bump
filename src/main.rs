@@ -161,8 +161,13 @@ fn main() -> anyhow::Result<()> {
         println!("{}", "Changes:\n".bold().underline());
         print_diff(&diff);
         println!(
-            "{} dependency are out of sync in: {}\n",
+            "{} {} out of sync in: {}\n",
             diff.len().to_string().bold(),
+            if diff.len() == 1 {
+                "dependency is"
+            } else {
+                "dependencies are"
+            },
             PYPROJECT_FILENAME.bright_blue()
         );
     }
