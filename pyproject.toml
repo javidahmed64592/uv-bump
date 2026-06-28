@@ -1,0 +1,31 @@
+[build-system]
+requires = ["maturin>=1.9.3,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "uv-bump"
+version = "0.1.0"
+description = "Update pyproject.toml dependency constraints using versions resolved by uv."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Javid Ahmed", email = "javidahmed@icloud.com" }
+]
+keywords = ["uv", "dependencies", "python", "packaging"]
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+]
+
+[project.optional-dependencies]
+dev = [
+    "maturin>=1.14.1",
+]
+
+[project.urls]
+repository = "https://github.com/javidahmed64592/uv-bump"
+
+[tool.maturin]
+bindings = "bin"
+manifest-path = "Cargo.toml"

@@ -1,4 +1,4 @@
-//! Update dependencies in `pyproject.toml` using versions resolved by `uv`
+//! Update pyproject.toml dependency constraints using versions resolved by uv.
 
 mod cli;
 mod diff;
@@ -87,9 +87,9 @@ fn main() -> anyhow::Result<()> {
 
     if upgrade_flag {
         println!(
-            "Updating dependencies in '{}' using '{}'...",
+            "Updating dependencies in '{}' using: {}",
             LOCKFILE_FILENAME.bright_blue(),
-            "uv".bright_green()
+            UPDATE_COMMAND.bright_green()
         );
 
         // Check that uv is installed and available in the PATH
@@ -136,11 +136,7 @@ fn main() -> anyhow::Result<()> {
         } else {
             println!(
                 "{}",
-                get_success_msg(&format!(
-                    "Dependencies in '{}' updated successfully using '{}'!",
-                    LOCKFILE_FILENAME.bright_blue(),
-                    UPDATE_COMMAND.bright_green()
-                ))
+                get_success_msg("Dependencies updated successfully!\n")
             );
         }
     }
@@ -160,7 +156,7 @@ fn main() -> anyhow::Result<()> {
         println!("{}", "Changes:\n".bold().underline());
         print_diff(&diff);
         println!(
-            "{} dependency are out of sync in: {}",
+            "{} dependency are out of sync in: {}\n",
             diff.len().to_string().bold(),
             PYPROJECT_FILENAME.bright_blue()
         );
@@ -182,7 +178,7 @@ fn main() -> anyhow::Result<()> {
 
     // Confirm before applying changes
     if !yes_flag {
-        print!("{}", "Apply these changes? (y/N) ".bright_yellow());
+        print!("{}", "Apply these changes? [y/N]: ".bright_yellow());
         std::io::Write::flush(&mut std::io::stdout())?;
 
         terminal::enable_raw_mode()?;
@@ -197,9 +193,9 @@ fn main() -> anyhow::Result<()> {
 
         // Print the key the user pressed so the line feels complete
         if confirmed {
-            println!("y");
+            println!("{}", "y".bold());
         } else {
-            println!("N");
+            println!("{}", "N".bold());
         }
 
         if !confirmed {

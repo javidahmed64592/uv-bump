@@ -33,3 +33,13 @@ jobs:
 
       - name: Build release
         run: cargo build --release
+
+  maturin-develop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: javidahmed64592/actions-template-python/actions/setup/setup-uv-python@main
+      - uses: javidahmed64592/actions-template-python/actions/setup/install-python-dev@main
+
+      - name: Run develop
+        run: uv run maturin develop --release

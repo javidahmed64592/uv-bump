@@ -2,6 +2,7 @@
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json&style=flat-square)](https://docs.astral.sh/uv/)
 [![CI](https://img.shields.io/github/actions/workflow/status/javidahmed64592/uv-bump/ci.yml?branch=main&style=flat-square&label=CI&logo=github)](https://github.com/javidahmed64592/uv-bump/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/github/actions/workflow/status/javidahmed64592/uv-bump/docs.yml?branch=main&style=flat-square&label=Docs&logo=github)](https://github.com/javidahmed64592/uv-bump/actions/workflows/docs.yml)
+[![Publish](https://img.shields.io/github/actions/workflow/status/javidahmed64592/uv-bump/publish.yml?branch=main&style=flat-square&label=Publish&logo=github)](https://github.com/javidahmed64592/uv-bump/actions/workflows/publish.yml)
 [![Release](https://img.shields.io/github/actions/workflow/status/javidahmed64592/uv-bump/release.yml?style=flat-square&label=Release&logo=github)](https://github.com/javidahmed64592/uv-bump/actions/workflows/release.yml)
 [![License: GPLv3](https://img.shields.io/badge/License-GPLv3-yellow.svg)](https://www.gnu.org/licenses/gpl-3.0.en.html)
 
