@@ -4,7 +4,15 @@ version = "0.1.0"
 description = "Update pyproject.toml dependency constraints using versions resolved by uv."
 edition = "2024"
 repository = "https://github.com/javidahmed64592/uv-bump"
+homepage = "https://github.com/javidahmed64592/uv-bump"
 license = "GPL-3.0-or-later"
+authors = ["Javid Ahmed <javidahmed@icloud.com>"]
+
+[package.metadata.wix]
+upgrade-guid = "D5322CA2-252D-4596-BADB-B46F01EC9D2C"
+path-guid = "1456BD68-0714-498B-B2A8-17AF23973F16"
+license = false
+eula = false
 
 [[bin]]
 name = "uv-bump"
