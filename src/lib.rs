@@ -1,3 +1,6 @@
+use std::process::Output;
+
+use anyhow::Context;
 use owo_colors::OwoColorize;
 
 // General methods
@@ -135,6 +138,135 @@ pub fn compute_dependency_changes(mapped_deps: &[MappedDependency]) -> Vec<Depen
     }
 
     changes
+}
+
+// Methods for handling `uv lock --upgrade`
+
+/// Check `uv` command availability.
+pub fn check_uv_command() -> Result<(), std::io::Error> {
+    match std::process::Command::new("uv").arg("--version").output() {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            eprintln!(
+                "{}",
+                get_error_msg(&format!(
+                    "Failed to execute '{}'. Ensure it is installed and available in the PATH. Error: {}",
+                    "uv".bright_green(),
+                    e.to_string().bright_red()
+                ))
+            );
+            std::process::exit(127);
+        }
+    }
+}
+
+/// Run `uv lock --upgrade` command and return the output.
+pub fn run_uv_lock_upgrade(update_command: &str) -> Result<Output, std::io::Error> {
+    let split_command = update_command.split_whitespace().collect::<Vec<&str>>();
+    let output = std::process::Command::new(split_command[0])
+        .args(&split_command[1..])
+        .output()
+        .with_context(|| {
+            get_error_msg(&format!(
+                "Failed to execute: '{}'",
+                update_command.bright_green()
+            ))
+        })
+        .unwrap_or_else(|e| {
+            eprintln!(
+                "{}",
+                get_error_msg(&format!(
+                    "Failed to update dependencies using '{}'. Error: {}",
+                    update_command.bright_green(),
+                    e.to_string().bright_red()
+                ))
+            );
+            std::process::exit(126);
+        });
+
+    if !output.status.success() {
+        eprintln!(
+            "{}",
+            get_error_msg(&format!(
+                "'{}' command failed with exit code: {}",
+                update_command.bright_green(),
+                output.status.code().unwrap_or(-1).to_string().bright_red()
+            ))
+        );
+        std::process::exit(1);
+    }
+
+    Ok(output)
+}
+
+/// Collect modified dependencies from output of `uv lock --upgrade`.
+/// Returns a tuple of (updated, added, removed) package names.
+pub fn parse_uv_update_output(output: &Output) -> (Vec<String>, Vec<String>, Vec<String>) {
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    let mut updated = Vec::new();
+    let mut added = Vec::new();
+    let mut removed = Vec::new();
+
+    for line in stderr.lines() {
+        let trimmed = line.trim_start();
+        if let Some(pkg) = trimmed.strip_prefix("Updated ") {
+            updated.push(pkg.trim().to_string());
+        } else if let Some(pkg) = trimmed.strip_prefix("Added ") {
+            added.push(pkg.trim().to_string());
+        } else if let Some(pkg) = trimmed.strip_prefix("Removed ") {
+            removed.push(pkg.trim().to_string());
+        }
+    }
+
+    (updated, added, removed)
+}
+
+pub fn print_uv_modified_dependencies(
+    updated: Vec<String>,
+    added: Vec<String>,
+    removed: Vec<String>,
+    verbose: bool,
+) {
+    let updated_count = updated.len();
+    let added_count = added.len();
+    let removed_count = removed.len();
+
+    // Print the summary of changes
+    if updated_count == 0 && added_count == 0 && removed_count == 0 {
+        println!("{}", get_success_msg("Dependencies already up to date!\n"));
+    } else {
+        let mut parts = Vec::new();
+        if updated_count > 0 {
+            parts.push(format!("{} updated", updated_count.to_string().bold()));
+        }
+        if added_count > 0 {
+            parts.push(format!("{} added", added_count.to_string().bold()));
+        }
+        if removed_count > 0 {
+            parts.push(format!("{} removed", removed_count.to_string().bold()));
+        }
+        println!(
+            "{}",
+            get_success_msg(&format!("Dependencies: {}!\n", parts.join(", ")))
+        );
+
+        if verbose {
+            println!("Updated dependencies:");
+            for dep in updated {
+                println!("  {} {}", "~".bright_yellow().bold(), dep);
+            }
+            println!("Added dependencies:");
+            for dep in added {
+                println!("  {} {}", "+".bright_green().bold(), dep);
+            }
+            println!("Removed dependencies:");
+            for dep in removed {
+                println!("  {} {}", "-".bright_red().bold(), dep);
+            }
+            println!();
+        }
+    }
 }
 
 #[cfg(test)]
