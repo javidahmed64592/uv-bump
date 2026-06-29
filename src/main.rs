@@ -5,7 +5,6 @@ mod diff;
 mod lockfile;
 mod pyproject;
 
-use anyhow::Context;
 use clap::Parser;
 use cli::Cli;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
@@ -16,8 +15,8 @@ use owo_colors::OwoColorize;
 use pyproject::{apply_changes, read_dependencies};
 use std::path::Path;
 use uv_align::{
-    compute_dependency_changes, get_error_msg, get_success_msg, get_warning_msg, map_dependencies,
-    parse_uv_update_output, print_modified_dependencies,
+    check_uv_command, compute_dependency_changes, get_error_msg, get_success_msg, get_warning_msg,
+    map_dependencies, parse_uv_update_output, print_modified_dependencies, run_uv_lock_upgrade,
 };
 
 const PYPROJECT_FILENAME: &str = "pyproject.toml";
@@ -94,55 +93,8 @@ fn main() -> anyhow::Result<()> {
             UPDATE_COMMAND.bright_green()
         );
 
-        // Check that uv is installed and available in the PATH
-        if let Err(e) = std::process::Command::new("uv").arg("--version").output() {
-            eprintln!(
-                "{}",
-                get_error_msg(&format!(
-                    "Failed to execute '{}'. Ensure it is installed and available in the PATH. Error: {}",
-                    "uv".bright_green(),
-                    e.to_string().bright_red()
-                ))
-            );
-            std::process::exit(127);
-        }
-
-        // Run `uv lock --upgrade` to update the lockfile
-        let split_command = UPDATE_COMMAND.split_whitespace().collect::<Vec<&str>>();
-        let output = std::process::Command::new(split_command[0])
-            .args(&split_command[1..])
-            .output()
-            .with_context(|| {
-                get_error_msg(&format!(
-                    "Failed to execute: '{}'",
-                    UPDATE_COMMAND.bright_green()
-                ))
-            })
-            .unwrap_or_else(|e| {
-                eprintln!(
-                    "{}",
-                    get_error_msg(&format!(
-                        "Failed to update dependencies using '{}'. Error: {}",
-                        UPDATE_COMMAND.bright_green(),
-                        e.to_string().bright_red()
-                    ))
-                );
-                std::process::exit(126);
-            });
-
-        if !output.status.success() {
-            eprintln!(
-                "{}",
-                get_error_msg(&format!(
-                    "'{}' command failed with exit code: {}",
-                    UPDATE_COMMAND.bright_green(),
-                    output.status.code().unwrap_or(-1).to_string().bright_red()
-                ))
-            );
-            std::process::exit(1);
-        }
-
-        // Parse the output to count updated, added, and removed dependencies
+        check_uv_command()?;
+        let output = run_uv_lock_upgrade(UPDATE_COMMAND)?;
         let (updated, added, removed) = parse_uv_update_output(&output);
         print_modified_dependencies(updated, added, removed, verbose_flag);
     }

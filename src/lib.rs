@@ -1,5 +1,6 @@
 use std::process::Output;
 
+use anyhow::Context;
 use owo_colors::OwoColorize;
 
 // General methods
@@ -139,7 +140,64 @@ pub fn compute_dependency_changes(mapped_deps: &[MappedDependency]) -> Vec<Depen
     changes
 }
 
-// Methods for parsing `uv` output
+// Methods for handling `uv lock --upgrade`
+
+/// Check `uv` command availability.
+pub fn check_uv_command() -> Result<(), std::io::Error> {
+    match std::process::Command::new("uv").arg("--version").output() {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            eprintln!(
+                "{}",
+                get_error_msg(&format!(
+                    "Failed to execute '{}'. Ensure it is installed and available in the PATH. Error: {}",
+                    "uv".bright_green(),
+                    e.to_string().bright_red()
+                ))
+            );
+            std::process::exit(127);
+        }
+    }
+}
+
+/// Run `uv lock --upgrade` command and return the output.
+pub fn run_uv_lock_upgrade(update_command: &str) -> Result<Output, std::io::Error> {
+    let split_command = update_command.split_whitespace().collect::<Vec<&str>>();
+    let output = std::process::Command::new(split_command[0])
+        .args(&split_command[1..])
+        .output()
+        .with_context(|| {
+            get_error_msg(&format!(
+                "Failed to execute: '{}'",
+                update_command.bright_green()
+            ))
+        })
+        .unwrap_or_else(|e| {
+            eprintln!(
+                "{}",
+                get_error_msg(&format!(
+                    "Failed to update dependencies using '{}'. Error: {}",
+                    update_command.bright_green(),
+                    e.to_string().bright_red()
+                ))
+            );
+            std::process::exit(126);
+        });
+
+    if !output.status.success() {
+        eprintln!(
+            "{}",
+            get_error_msg(&format!(
+                "'{}' command failed with exit code: {}",
+                update_command.bright_green(),
+                output.status.code().unwrap_or(-1).to_string().bright_red()
+            ))
+        );
+        std::process::exit(1);
+    }
+
+    Ok(output)
+}
 
 /// Collect modified dependencies from output of `uv lock --upgrade`.
 /// Returns a tuple of (updated, added, removed) package names.
