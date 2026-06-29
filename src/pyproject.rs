@@ -32,7 +32,7 @@ fn parse_constraint(s: &str) -> (Option<String>, Option<String>, Option<String>)
     let version_end = rest.find(',').unwrap_or(rest.len());
     let version = rest[..version_end].trim().to_string();
 
-    // Suffix: any trailing specifiers e.g. ",<1.0" — preserved verbatim on write-back
+    // Suffix: any trailing specifiers e.g. ",<1.0" - preserved verbatim on write-back
     let suffix = if version_end < rest.len() {
         Some(rest[version_end..].to_string())
     } else {
@@ -176,7 +176,7 @@ pub fn read_dependencies(path: &Path) -> Result<Vec<PyprojectDependency>> {
         }
     }
 
-    // ── [dependency-groups] (PEP 735 — supported by uv) ────────────────────
+    // ── [dependency-groups] (PEP 735 - supported by uv) ────────────────────
     // Values can be plain strings OR inline tables e.g. `{ include-group = "..." }`.
     // Only string entries are package specifiers; table entries are skipped.
     if let Some(Value::Table(dg)) = doc.get("dependency-groups") {
@@ -189,7 +189,7 @@ pub fn read_dependencies(path: &Path) -> Result<Vec<PyprojectDependency>> {
                                 deps.push(dep);
                             }
                         }
-                        Value::Table(_) => {} // { include-group = "other" } — not a package
+                        Value::Table(_) => {} // { include-group = "other" } - not a package
                         _ => {}
                     }
                 }
@@ -222,7 +222,7 @@ fn replace_in_array(item: &mut Item, name: &str, new_spec: &str) {
 
 /// Write dependency version changes back to `pyproject.toml` at `path`.
 ///
-/// Uses [`toml_edit`] to perform format-preserving edits — only the version
+/// Uses [`toml_edit`] to perform format-preserving edits - only the version
 /// numbers are modified; all comments, whitespace, and key ordering are retained.
 ///
 /// Each changed dependency is looked up in `deps` to determine its group
