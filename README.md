@@ -50,6 +50,7 @@ Options:
       --check    Show a diff of dependency updates without applying them
   -y, --yes      Automatically apply all changes without prompting
   -u, --upgrade  Upgrade dependencies in `uv.lock` with `uv`
+  -v, --verbose  Show detailed information about dependency updates
   -h, --help     Print help
 ```
 

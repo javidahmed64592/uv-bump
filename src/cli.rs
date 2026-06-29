@@ -25,4 +25,8 @@ pub struct Cli {
     /// Upgrade dependencies in `uv.lock` with `uv`
     #[arg(short = 'u', long = "upgrade")]
     pub upgrade: bool,
+
+    /// Show detailed information about dependency updates
+    #[arg(short = 'v', long = "verbose")]
+    pub verbose: bool,
 }

@@ -17,6 +17,7 @@ use pyproject::{apply_changes, read_dependencies};
 use std::path::Path;
 use uv_align::{
     compute_dependency_changes, get_error_msg, get_success_msg, get_warning_msg, map_dependencies,
+    parse_uv_update_output, print_modified_dependencies,
 };
 
 const PYPROJECT_FILENAME: &str = "pyproject.toml";
@@ -30,6 +31,7 @@ fn main() -> anyhow::Result<()> {
     let check_flag = cli.check;
     let yes_flag = cli.yes;
     let upgrade_flag = cli.upgrade;
+    let verbose_flag = cli.verbose;
 
     // Ensure check and yes flags are not both specified
     if check_flag && yes_flag {
@@ -107,9 +109,9 @@ fn main() -> anyhow::Result<()> {
 
         // Run `uv lock --upgrade` to update the lockfile
         let split_command = UPDATE_COMMAND.split_whitespace().collect::<Vec<&str>>();
-        let status = std::process::Command::new(split_command[0])
+        let output = std::process::Command::new(split_command[0])
             .args(&split_command[1..])
-            .status()
+            .output()
             .with_context(|| {
                 get_error_msg(&format!(
                     "Failed to execute: '{}'",
@@ -128,22 +130,21 @@ fn main() -> anyhow::Result<()> {
                 std::process::exit(126);
             });
 
-        if !status.success() {
+        if !output.status.success() {
             eprintln!(
                 "{}",
                 get_error_msg(&format!(
                     "'{}' command failed with exit code: {}",
                     UPDATE_COMMAND.bright_green(),
-                    status.code().unwrap_or(-1).to_string().bright_red()
+                    output.status.code().unwrap_or(-1).to_string().bright_red()
                 ))
             );
             std::process::exit(1);
-        } else {
-            println!(
-                "{}",
-                get_success_msg("Dependencies updated successfully!\n")
-            );
         }
+
+        // Parse the output to count updated, added, and removed dependencies
+        let (updated, added, removed) = parse_uv_update_output(&output);
+        print_modified_dependencies(updated, added, removed, verbose_flag);
     }
 
     // Compute and print the diff of dependency changes
@@ -155,13 +156,13 @@ fn main() -> anyhow::Result<()> {
 
     // If there are no changes, exit early
     if diff.is_empty() {
-        println!("{}", get_success_msg("Dependencies are already in sync!"));
+        println!("{}", get_warning_msg("Dependencies are already in sync!"));
         return Ok(());
     } else {
         println!("{}", "Changes:\n".bold().underline());
         print_diff(&diff);
         println!(
-            "{} {} out of sync in: {}\n",
+            "{} {} out of sync in: {}",
             diff.len().to_string().bold(),
             if diff.len() == 1 {
                 "dependency is"
@@ -201,20 +202,15 @@ fn main() -> anyhow::Result<()> {
         };
         terminal::disable_raw_mode()?;
 
-        // Print the key the user pressed so the line feels complete
         if confirmed {
             println!("{}", "y".bold());
         } else {
             println!("{}", "N".bold());
-        }
-
-        if !confirmed {
             println!("{}", get_warning_msg("Aborting changes..."));
             return Ok(());
         }
     }
 
-    println!("Applying changes...");
     apply_changes(pyproject_path, &diff, &dependencies)?;
     println!("{}", get_success_msg("Changes applied successfully!"));
     Ok(())
