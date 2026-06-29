@@ -1,4 +1,4 @@
-//! Update pyproject.toml dependency constraints using versions resolved by uv.
+//! Align `pyproject.toml` dependency constraints with versions resolved by `uv`
 
 mod cli;
 mod diff;

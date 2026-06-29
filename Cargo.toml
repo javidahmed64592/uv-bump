@@ -1,12 +1,14 @@
 [package]
 name = "uv-align"
 version = "0.1.1"
-description = "Update pyproject.toml dependency constraints using versions resolved by uv."
+description = "Align `pyproject.toml` dependency constraints with versions resolved by `uv`."
 edition = "2024"
 repository = "https://github.com/javidahmed64592/uv-align"
-homepage = "https://github.com/javidahmed64592/uv-align"
+homepage = "https://pypi.org/project/uv-align"
 license = "MIT"
 authors = ["Javid Ahmed <javidahmed@icloud.com>"]
+keywords = ["uv", "python", "dependencies", "pyproject", "cli"]
+categories = ["command-line-utilities", "development-tools"]
 
 [package.metadata.wix]
 upgrade-guid = "D5322CA2-252D-4596-BADB-B46F01EC9D2C"

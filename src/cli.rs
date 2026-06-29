@@ -9,7 +9,7 @@ use uv_align::get_error_msg;
 #[derive(Parser, Debug)]
 #[command(
     name = "uv-align",
-    about = "Update dependency constraints using versions resolved by `uv`"
+    about = "Align `pyproject.toml` dependency constraints with versions resolved by `uv`"
 )]
 pub struct Cli {
     /// Path to folder containing `pyproject.toml` and `uv.lock` files
@@ -24,7 +24,7 @@ pub struct Cli {
     #[arg(short = 'y', long)]
     pub yes: bool,
 
-    /// Upgrade dependencies in `uv.lock` with `uv`
+    /// Upgrade dependencies in `uv.lock` with `uv lock --upgrade`
     #[arg(short = 'u', long = "upgrade")]
     pub upgrade: bool,
 

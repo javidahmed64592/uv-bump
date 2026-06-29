@@ -69,7 +69,7 @@
 
         <Package Id='*'
             Keywords='Installer'
-            Description='Update pyproject.toml dependency constraints using versions resolved by uv.'
+            Description='Align `pyproject.toml` dependency constraints with versions resolved by `uv`.'
             Manufacturer='Javid Ahmed'
             InstallerVersion='450'
             Languages='1033'
@@ -173,7 +173,7 @@
         <!--<Icon Id='ProductICO' SourceFile='wix\Product.ico'/>-->
         <!--<Property Id='ARPPRODUCTICON' Value='ProductICO' />-->
 
-        <Property Id='ARPHELPLINK' Value='https://github.com/javidahmed64592/uv-align'/>
+        <Property Id='ARPHELPLINK' Value='https://pypi.org/project/uv-align'/>
         
         <UI>
             <UIRef Id='WixUI_FeatureTree'/>
