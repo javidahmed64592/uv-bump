@@ -5,8 +5,7 @@ mod diff;
 mod lockfile;
 mod pyproject;
 
-use clap::Parser;
-use cli::Cli;
+use cli::{parse_cli_args, validate_conflicting_flags};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use crossterm::terminal;
 use diff::print_diff;
@@ -15,8 +14,9 @@ use owo_colors::OwoColorize;
 use pyproject::{apply_changes, read_dependencies};
 use std::path::Path;
 use uv_align::{
-    check_uv_command, compute_dependency_changes, get_error_msg, get_success_msg, get_warning_msg,
+    check_uv_command, compute_dependency_changes, get_success_msg, get_warning_msg,
     map_dependencies, parse_uv_update_output, print_uv_modified_dependencies, run_uv_lock_upgrade,
+    validate_file_exists, validate_root_directory_exists,
 };
 
 const PYPROJECT_FILENAME: &str = "pyproject.toml";
@@ -24,69 +24,22 @@ const LOCKFILE_FILENAME: &str = "uv.lock";
 const UPDATE_COMMAND: &str = "uv lock --upgrade";
 
 fn main() -> anyhow::Result<()> {
-    let cli = Cli::parse();
+    // Get CLI arguments
+    let cli = parse_cli_args();
+    validate_conflicting_flags(cli.check, cli.yes, "--check", "-y / --yes")?;
 
-    let root_path = cli.path.clone();
-    let check_flag = cli.check;
-    let yes_flag = cli.yes;
-    let upgrade_flag = cli.upgrade;
-    let verbose_flag = cli.verbose;
+    // Validate the root directory and required files
+    validate_root_directory_exists(&cli.path)?;
+    std::env::set_current_dir(&cli.path)?;
 
-    // Ensure check and yes flags are not both specified
-    if check_flag && yes_flag {
-        eprintln!(
-            "{}",
-            get_error_msg(&format!(
-                "The '{}' and '{}' flags cannot be used together.",
-                "--check".bright_green(),
-                "--yes".bright_green()
-            ))
-        );
-        std::process::exit(2);
-    }
-
-    // Check if the path exists and is a directory
-    if !root_path.exists() || !root_path.is_dir() {
-        eprintln!(
-            "{}",
-            get_error_msg(&format!(
-                "The specified path does not exist or is not a directory: {}",
-                root_path.display().bright_blue()
-            ))
-        );
-        std::process::exit(2);
-    }
-    std::env::set_current_dir(&root_path)?;
-
-    // Check if pyproject.toml and uv.lock exist in the specified path
     let pyproject_path = Path::new(PYPROJECT_FILENAME);
     let lockfile_path = Path::new(LOCKFILE_FILENAME);
 
-    if !pyproject_path.exists() {
-        eprintln!(
-            "{}",
-            get_error_msg(&format!(
-                "'{}' does not exist in the specified path: {}",
-                PYPROJECT_FILENAME.bright_blue(),
-                root_path.display().bright_blue()
-            ))
-        );
-        std::process::exit(2);
-    }
+    validate_file_exists(pyproject_path)?;
+    validate_file_exists(lockfile_path)?;
 
-    if !lockfile_path.exists() {
-        eprintln!(
-            "{}",
-            get_error_msg(&format!(
-                "'{}' does not exist in the specified path: {}",
-                LOCKFILE_FILENAME.bright_blue(),
-                root_path.display().bright_blue()
-            ))
-        );
-        std::process::exit(2);
-    }
-
-    if upgrade_flag {
+    // Upgrade dependencies in `uv.lock` if the upgrade flag is set
+    if cli.upgrade {
         println!(
             "Updating dependencies in '{}' using: {}",
             LOCKFILE_FILENAME.bright_blue(),
@@ -96,7 +49,7 @@ fn main() -> anyhow::Result<()> {
         check_uv_command()?;
         let output = run_uv_lock_upgrade(UPDATE_COMMAND)?;
         let (updated, added, removed) = parse_uv_update_output(&output);
-        print_uv_modified_dependencies(updated, added, removed, verbose_flag);
+        print_uv_modified_dependencies(updated, added, removed, cli.verbose);
     }
 
     // Compute and print the diff of dependency changes
@@ -106,7 +59,6 @@ fn main() -> anyhow::Result<()> {
     let mapped_dependencies = map_dependencies(&dependencies, &lock_versions);
     let diff = compute_dependency_changes(&mapped_dependencies);
 
-    // If there are no changes, exit early
     if diff.is_empty() {
         println!("{}", get_warning_msg("Dependencies are already in sync!"));
         return Ok(());
@@ -125,22 +77,22 @@ fn main() -> anyhow::Result<()> {
         );
     }
 
-    // If the check flag is set, exit after printing the diff
-    if check_flag {
+    // Exit after printing the diff if the check flag is set
+    if cli.check {
         println!(
             "{}",
             get_success_msg(&format!(
                 "Run '{} {}' without the '{}' flag to apply changes.",
                 "uv-align".bright_green(),
-                root_path.display().to_string().bright_green(),
+                cli.path.display().to_string().bright_green(),
                 "--check".bright_green()
             ))
         );
         std::process::exit(1);
     }
 
-    // Confirm before applying changes
-    if !yes_flag {
+    // Confirm before applying changes if the yes flag is not set
+    if !cli.yes {
         print!("{}", "Apply these changes? [y/N]: ".bright_yellow());
         std::io::Write::flush(&mut std::io::stdout())?;
 
@@ -163,6 +115,7 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
+    // Apply the changes to `pyproject.toml`
     apply_changes(pyproject_path, &diff, &dependencies)?;
     println!("{}", get_success_msg("Changes applied successfully!"));
     Ok(())
