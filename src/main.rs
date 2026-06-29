@@ -16,7 +16,7 @@ use pyproject::{apply_changes, read_dependencies};
 use std::path::Path;
 use uv_align::{
     check_uv_command, compute_dependency_changes, get_error_msg, get_success_msg, get_warning_msg,
-    map_dependencies, parse_uv_update_output, print_modified_dependencies, run_uv_lock_upgrade,
+    map_dependencies, parse_uv_update_output, print_uv_modified_dependencies, run_uv_lock_upgrade,
 };
 
 const PYPROJECT_FILENAME: &str = "pyproject.toml";
@@ -96,7 +96,7 @@ fn main() -> anyhow::Result<()> {
         check_uv_command()?;
         let output = run_uv_lock_upgrade(UPDATE_COMMAND)?;
         let (updated, added, removed) = parse_uv_update_output(&output);
-        print_modified_dependencies(updated, added, removed, verbose_flag);
+        print_uv_modified_dependencies(updated, added, removed, verbose_flag);
     }
 
     // Compute and print the diff of dependency changes

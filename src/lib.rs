@@ -222,7 +222,7 @@ pub fn parse_uv_update_output(output: &Output) -> (Vec<String>, Vec<String>, Vec
     (updated, added, removed)
 }
 
-pub fn print_modified_dependencies(
+pub fn print_uv_modified_dependencies(
     updated: Vec<String>,
     added: Vec<String>,
     removed: Vec<String>,
