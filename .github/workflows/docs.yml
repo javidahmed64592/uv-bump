@@ -7,8 +7,8 @@ on:
   pull_request:
 
 permissions:
-  "pages": write
-  "id-token": write
+  pages: write
+  id-token: write
 
 jobs:
   build-docs:
@@ -22,18 +22,19 @@ jobs:
 
       - name: Get package name
         id: get_package_name
-        run: echo "package_name=$(cargo pkgid | cut -d# -f2 | cut -d@ -f1)" >> $GITHUB_OUTPUT
+        run: |
+          echo "package_name=$(cargo pkgid | sed 's/.*#\(.*\)@.*/\1/')" >> $GITHUB_OUTPUT
 
       - name: Build documentation
         run: cargo doc --no-deps --release
 
       - name: Add redirect index
-        run: echo '<meta http-equiv="refresh" content="0; url=./${{ steps.get_package_name.outputs.package_name }}/index.html">' > target/doc/index.html
+        run: |
+          echo '<meta http-equiv="refresh" content="0; url=./${{ steps.get_package_name.outputs.package_name }}/index.html">' > target/doc/index.html
 
       - name: Upload documentation artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-pages-artifact@v3
         with:
-          name: docs
           path: target/doc
 
   publish-docs:
@@ -42,16 +43,5 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
-      - name: Download documentation artifact
-        uses: actions/download-artifact@v8
-        with:
-          name: docs
-          path: target/doc
-
-      - name: Upload to GitHub Pages
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: target/doc
-
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v5
