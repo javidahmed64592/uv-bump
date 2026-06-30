@@ -58,10 +58,21 @@ fn main() -> anyhow::Result<()> {
             UPDATE_COMMAND.bright_green()
         );
 
-        check_uv_command()?;
-        let output = run_uv_lock_upgrade(UPDATE_COMMAND)?;
-        let (updated, added, removed) = parse_uv_update_output(&output);
-        print_uv_modified_dependencies(updated, added, removed, cli.verbose);
+        if let Err(error) = check_uv_command() {
+            eprintln!("{}", error);
+            std::process::exit(127);
+        }
+
+        match run_uv_lock_upgrade(UPDATE_COMMAND) {
+            Ok(output) => {
+                let (updated, added, removed) = parse_uv_update_output(&output);
+                print_uv_modified_dependencies(updated, added, removed, cli.verbose);
+            }
+            Err(error) => {
+                eprintln!("{}", error);
+                std::process::exit(126);
+            }
+        }
     }
 
     // Compute and print the diff of dependency changes

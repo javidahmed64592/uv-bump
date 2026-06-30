@@ -1,6 +1,5 @@
 use std::{path, process::Output};
 
-use anyhow::Context;
 use owo_colors::OwoColorize;
 
 // Structs representing dependencies
@@ -104,57 +103,39 @@ pub fn validate_file_exists(filepath: &path::Path) -> Result<(), anyhow::Error> 
 // Methods for handling `uv lock --upgrade`
 
 /// Check `uv` command availability.
-pub fn check_uv_command() -> Result<(), std::io::Error> {
+pub fn check_uv_command() -> Result<(), anyhow::Error> {
     match std::process::Command::new("uv").arg("--version").output() {
         Ok(_) => Ok(()),
         Err(e) => {
-            eprintln!(
-                "{}",
-                get_error_msg(&format!(
-                    "Failed to execute '{}'. Ensure it is installed and available in the PATH. Error: {}",
-                    "uv".bright_green(),
-                    e.to_string().bright_red()
-                ))
-            );
-            std::process::exit(127);
+            return Err(anyhow::anyhow!(get_error_msg(&format!(
+                "Failed to execute '{}'. Ensure it is installed and available in the PATH. Error: {}",
+                "uv".bright_red(),
+                e.to_string().bright_red()
+            ))));
         }
     }
 }
 
 /// Run `uv lock --upgrade` command and return the output.
-pub fn run_uv_lock_upgrade(update_command: &str) -> Result<Output, std::io::Error> {
+pub fn run_uv_lock_upgrade(update_command: &str) -> Result<Output, anyhow::Error> {
     let split_command = update_command.split_whitespace().collect::<Vec<&str>>();
     let output = std::process::Command::new(split_command[0])
         .args(&split_command[1..])
         .output()
-        .with_context(|| {
-            get_error_msg(&format!(
-                "Failed to execute: '{}'",
-                update_command.bright_green()
-            ))
-        })
-        .unwrap_or_else(|e| {
-            eprintln!(
-                "{}",
-                get_error_msg(&format!(
-                    "Failed to update dependencies using '{}'. Error: {}",
-                    update_command.bright_green(),
-                    e.to_string().bright_red()
-                ))
-            );
-            std::process::exit(126);
-        });
+        .map_err(|e| {
+            anyhow::anyhow!(get_error_msg(&format!(
+                "Failed to execute '{}'. Error: {}",
+                update_command.bright_red(),
+                e.to_string().bright_red()
+            )))
+        })?;
 
     if !output.status.success() {
-        eprintln!(
-            "{}",
-            get_error_msg(&format!(
-                "'{}' command failed with exit code: {}",
-                update_command.bright_green(),
-                output.status.code().unwrap_or(-1).to_string().bright_red()
-            ))
-        );
-        std::process::exit(1);
+        return Err(anyhow::anyhow!(get_error_msg(&format!(
+            "'{}' command failed with exit code: {}",
+            update_command.bright_red(),
+            output.status.code().unwrap_or(-1).to_string().bright_red()
+        ))));
     }
 
     Ok(output)
