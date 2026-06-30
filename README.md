@@ -22,7 +22,6 @@ It does not require a virtual environment as it does not install packages, and n
 
 - [PyPI](https://pypi.org/project/uv-align/)
 - [GitHub](https://github.com/javidahmed64592/uv-align)
-- [Documentation](https://javidahmed64592.github.io/uv-align/)
 
 <!-- omit from toc -->
 ## Table of Contents
