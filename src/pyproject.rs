@@ -4,9 +4,16 @@ use std::path::Path;
 use toml::Value;
 use toml_edit::{DocumentMut, Item};
 
-use uv_align::{DependencyChange, PyprojectDependency, get_error_msg};
+use uv_align::{DependencyChange, PyprojectDependency, get_error_msg, normalise_dependency_name};
 
-// ─── Parsing ─────────────────────────────────────────────────────────────────
+// Parsing methods
+
+/// Struct representing a version constraint in a PEP 508 dependency string.
+struct VersionConstraint {
+    pub operator: Option<String>,
+    pub version: Option<String>,
+    pub suffix: Option<String>,
+}
 
 /// Parse a single version constraint string into its components.
 ///
@@ -18,9 +25,13 @@ use uv_align::{DependencyChange, PyprojectDependency, get_error_msg};
 /// Returns `(None, None, None)` for:
 ///   - empty strings
 ///   - URL/git dependencies (`@ git+...`)
-fn parse_constraint(s: &str) -> (Option<String>, Option<String>, Option<String>) {
+fn parse_version_constraint(s: &str) -> VersionConstraint {
     if s.is_empty() || s.starts_with('@') {
-        return (None, None, None);
+        return VersionConstraint {
+            operator: None,
+            version: None,
+            suffix: None,
+        };
     }
 
     // Operator: one of >=, <=, ==, ~=, !=, >, <
@@ -39,7 +50,11 @@ fn parse_constraint(s: &str) -> (Option<String>, Option<String>, Option<String>)
         None
     };
 
-    (Some(operator), Some(version), suffix)
+    VersionConstraint {
+        operator: Some(operator),
+        version: Some(version),
+        suffix,
+    }
 }
 
 /// Parse a single PEP 508 dependency string into a [`PyprojectDependency`].
@@ -62,7 +77,7 @@ fn parse_constraint(s: &str) -> (Option<String>, Option<String>, Option<String>)
 /// Extras are discarded as they are not relevant to version bumping.
 /// Environment markers are stripped.
 /// Git/URL dependencies (`@ git+...`) produce `operator = None`, `version = None`.
-fn parse_pep508(spec: &str, group: Option<String>) -> Option<PyprojectDependency> {
+fn parse_pep508_string(spec: &str, group: Option<String>) -> Option<PyprojectDependency> {
     let spec = spec.trim();
     if spec.is_empty() {
         return None;
@@ -95,7 +110,7 @@ fn parse_pep508(spec: &str, group: Option<String>) -> Option<PyprojectDependency
     if raw_name.is_empty() {
         return None;
     }
-    let normalised_name = uv_align::normalize_name(raw_name);
+    let normalised_name = normalise_dependency_name(raw_name);
 
     // Everything after the name (and optional extras) is the version specifier
     let rest = spec[name_end..].trim();
@@ -111,19 +126,19 @@ fn parse_pep508(spec: &str, group: Option<String>) -> Option<PyprojectDependency
     };
 
     // Parse the remaining constraint string e.g. ">=0.110.0" or ">=0.24,<1.0"
-    let (operator, version, suffix) = parse_constraint(rest);
+    let constraint = parse_version_constraint(rest);
 
     Some(PyprojectDependency {
         name: raw_name.to_string(),
         normalised_name,
-        operator,
-        version,
-        suffix,
+        operator: constraint.operator,
+        version: constraint.version,
+        suffix: constraint.suffix,
         group,
     })
 }
 
-// ─── Reading ─────────────────────────────────────────────────────────────────
+// Read methods
 
 /// Read `pyproject.toml` from `path` and return all dependencies across every group.
 ///
@@ -153,7 +168,7 @@ pub fn read_dependencies(path: &Path) -> Result<Vec<PyprojectDependency>> {
         if let Some(Value::Array(arr)) = project.get("dependencies") {
             for item in arr {
                 if let Value::String(s) = item
-                    && let Some(dep) = parse_pep508(s, None)
+                    && let Some(dep) = parse_pep508_string(s, None)
                 {
                     deps.push(dep);
                 }
@@ -166,7 +181,7 @@ pub fn read_dependencies(path: &Path) -> Result<Vec<PyprojectDependency>> {
                 if let Value::Array(arr) = group_value {
                     for item in arr {
                         if let Value::String(s) = item
-                            && let Some(dep) = parse_pep508(s, Some(group_name.clone()))
+                            && let Some(dep) = parse_pep508_string(s, Some(group_name.clone()))
                         {
                             deps.push(dep);
                         }
@@ -185,7 +200,7 @@ pub fn read_dependencies(path: &Path) -> Result<Vec<PyprojectDependency>> {
                 for item in arr {
                     match item {
                         Value::String(s) => {
-                            if let Some(dep) = parse_pep508(s, Some(group_name.clone())) {
+                            if let Some(dep) = parse_pep508_string(s, Some(group_name.clone())) {
                                 deps.push(dep);
                             }
                         }
@@ -200,7 +215,7 @@ pub fn read_dependencies(path: &Path) -> Result<Vec<PyprojectDependency>> {
     Ok(deps)
 }
 
-// ─── Writing ─────────────────────────────────────────────────────────────────
+// Write methods
 
 /// Find the entry in a TOML array whose string value contains `name`, and replace
 /// it with `new_spec`, preserving the original entry's surrounding whitespace and
@@ -286,18 +301,34 @@ pub fn apply_changes(
     Ok(())
 }
 
-// ─── Tests ───────────────────────────────────────────────────────────────────
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::collections::HashMap;
 
-    // ── parse_pep508 ─────────────────────────────────────────────────────────
+    // Parsing methods
+
+    #[test]
+    fn test_parse_version_constraint() {
+        let vc = parse_version_constraint(">=0.110.0");
+        assert_eq!(vc.operator, Some(">=".to_string()));
+        assert_eq!(vc.version, Some("0.110.0".to_string()));
+        assert_eq!(vc.suffix, None);
+
+        let vc2 = parse_version_constraint(">=0.24,<1.0");
+        assert_eq!(vc2.operator, Some(">=".to_string()));
+        assert_eq!(vc2.version, Some("0.24".to_string()));
+        assert_eq!(vc2.suffix, Some(",<1.0".to_string()));
+
+        let vc3 = parse_version_constraint("@ git+https://github.com/user/repo.git");
+        assert_eq!(vc3.operator, None);
+        assert_eq!(vc3.version, None);
+        assert_eq!(vc3.suffix, None);
+    }
 
     #[test]
     fn test_parse_bare_name() {
-        let dep = parse_pep508("requests", None).unwrap();
+        let dep = parse_pep508_string("requests", None).unwrap();
         assert_eq!(dep.name, "requests");
         assert_eq!(dep.operator, None);
         assert_eq!(dep.version, None);
@@ -307,7 +338,7 @@ mod tests {
 
     #[test]
     fn test_parse_gte_constraint() {
-        let dep = parse_pep508("fastapi>=0.110.0", None).unwrap();
+        let dep = parse_pep508_string("fastapi>=0.110.0", None).unwrap();
         assert_eq!(dep.name, "fastapi");
         assert_eq!(dep.operator, Some(">=".to_string()));
         assert_eq!(dep.version, Some("0.110.0".to_string()));
@@ -316,7 +347,7 @@ mod tests {
 
     #[test]
     fn test_parse_eq_constraint() {
-        let dep = parse_pep508("pydantic==2.6.1", None).unwrap();
+        let dep = parse_pep508_string("pydantic==2.6.1", None).unwrap();
         assert_eq!(dep.name, "pydantic");
         assert_eq!(dep.operator, Some("==".to_string()));
         assert_eq!(dep.version, Some("2.6.1".to_string()));
@@ -324,41 +355,8 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_multiple_specifiers() {
-        let dep = parse_pep508("httpx>=0.24,<1.0", None).unwrap();
-        assert_eq!(dep.name, "httpx");
-        assert_eq!(dep.operator, Some(">=".to_string()));
-        assert_eq!(dep.version, Some("0.24".to_string()));
-        assert_eq!(dep.suffix, Some(",<1.0".to_string()));
-    }
-
-    #[test]
-    fn test_parse_extras_ignored() {
-        let dep = parse_pep508("black[d]>=23.0", None).unwrap();
-        assert_eq!(dep.name, "black");
-        assert_eq!(dep.operator, Some(">=".to_string()));
-        assert_eq!(dep.version, Some("23.0".to_string()));
-        assert_eq!(dep.suffix, None);
-    }
-
-    #[test]
-    fn test_parse_marker_stripped() {
-        let dep = parse_pep508("tomli>=2.0 ; python_version < '3.11'", None).unwrap();
-        assert_eq!(dep.name, "tomli");
-        assert_eq!(dep.operator, Some(">=".to_string()));
-        assert_eq!(dep.version, Some("2.0".to_string()));
-        assert_eq!(dep.suffix, None);
-    }
-
-    #[test]
-    fn test_parse_group_propagated() {
-        let dep = parse_pep508("pytest>=7.0", Some("dev".into())).unwrap();
-        assert_eq!(dep.group, Some("dev".to_string()));
-    }
-
-    #[test]
     fn test_parse_compatible_release() {
-        let dep = parse_pep508("numpy~=1.24", None).unwrap();
+        let dep = parse_pep508_string("numpy~=1.24", None).unwrap();
         assert_eq!(dep.name, "numpy");
         assert_eq!(dep.operator, Some("~=".to_string()));
         assert_eq!(dep.version, Some("1.24".to_string()));
@@ -367,7 +365,7 @@ mod tests {
 
     #[test]
     fn test_parse_not_equal() {
-        let dep = parse_pep508("celery!=4.0", None).unwrap();
+        let dep = parse_pep508_string("celery!=4.0", None).unwrap();
         assert_eq!(dep.name, "celery");
         assert_eq!(dep.operator, Some("!=".to_string()));
         assert_eq!(dep.version, Some("4.0".to_string()));
@@ -375,12 +373,44 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_empty() {
-        assert!(parse_pep508("", None).is_none());
-        assert!(parse_pep508("   ", None).is_none());
+    fn test_parse_multiple_specifiers() {
+        let dep = parse_pep508_string("httpx>=0.24,<1.0", None).unwrap();
+        assert_eq!(dep.name, "httpx");
+        assert_eq!(dep.operator, Some(">=".to_string()));
+        assert_eq!(dep.version, Some("0.24".to_string()));
+        assert_eq!(dep.suffix, Some(",<1.0".to_string()));
+    }
+    #[test]
+    fn test_parse_extras_ignored() {
+        let dep = parse_pep508_string("black[d]>=23.0", None).unwrap();
+        assert_eq!(dep.name, "black");
+        assert_eq!(dep.operator, Some(">=".to_string()));
+        assert_eq!(dep.version, Some("23.0".to_string()));
+        assert_eq!(dep.suffix, None);
     }
 
-    // ── read_dependencies integration ────────────────────────────────────────
+    #[test]
+    fn test_parse_marker_stripped() {
+        let dep = parse_pep508_string("tomli>=2.0 ; python_version < '3.11'", None).unwrap();
+        assert_eq!(dep.name, "tomli");
+        assert_eq!(dep.operator, Some(">=".to_string()));
+        assert_eq!(dep.version, Some("2.0".to_string()));
+        assert_eq!(dep.suffix, None);
+    }
+
+    #[test]
+    fn test_parse_group_propagated() {
+        let dep = parse_pep508_string("pytest>=7.0", Some("dev".into())).unwrap();
+        assert_eq!(dep.group, Some("dev".to_string()));
+    }
+
+    #[test]
+    fn test_parse_empty() {
+        assert!(parse_pep508_string("", None).is_none());
+        assert!(parse_pep508_string("   ", None).is_none());
+    }
+
+    // Read methods
 
     #[test]
     fn test_read_full_pyproject() {

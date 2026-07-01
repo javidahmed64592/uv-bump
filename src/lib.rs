@@ -1,7 +1,60 @@
 use std::{path, process::Output};
 
-use anyhow::Context;
 use owo_colors::OwoColorize;
+
+// Structs representing dependencies
+
+/// A struct representing a dependency as read from `pyproject.toml`.
+#[derive(Debug, Clone)]
+pub struct PyprojectDependency {
+    /// The name of the dependency as written by the user.
+    pub name: String,
+    /// The normalised name of the dependency (per PEP 503).
+    pub normalised_name: String,
+    /// The version of the dependency, if any.
+    pub version: Option<String>,
+    /// The operator of the dependency, if any (">=", "==", "~=", etc.).
+    pub operator: Option<String>,
+    /// The suffix of the dependency, if any (",<1.0" or ",!=1.0.0").
+    pub suffix: Option<String>,
+    /// The group of the dependency, if any.
+    pub group: Option<String>,
+}
+
+/// A struct representing a dependency as read from `uv.lock`.
+#[derive(Debug, Clone)]
+pub struct LockDependency {
+    /// The name of the dependency as written by uv.
+    pub name: String,
+    /// The normalised name of the dependency (per PEP 503).
+    pub normalised_name: String,
+    /// The version of the dependency.
+    pub version: String,
+}
+
+/// A struct representing a dependency that has been mapped from `pyproject.toml` to `uv.lock`.
+#[derive(Debug, Clone)]
+pub struct MappedDependency {
+    /// The dependency as read from pyproject.toml.
+    pub pyproject: PyprojectDependency,
+    /// The dependency as read from uv.lock.
+    pub lock: LockDependency,
+}
+
+/// A struct representing a change in a dependency's version.
+#[derive(Debug, Clone)]
+pub struct DependencyChange {
+    /// The name of the dependency.
+    pub name: String,
+    /// The operator of the dependency, if any (">=", "==", "~=", etc.).
+    pub operator: Option<String>,
+    /// The old version number of the dependency.
+    pub old: String,
+    /// The new version number of the dependency.
+    pub new: String,
+    /// The suffix of the dependency, if any (",<1.0" or ",!=1.0.0").
+    pub suffix: Option<String>,
+}
 
 // General methods
 
@@ -21,94 +74,66 @@ pub fn get_error_msg(msg: &str) -> String {
 }
 
 /// Validate that the specified root directory exists and is a directory.
-pub fn validate_root_directory_exists(root_path: &path::Path) -> Result<(), std::io::Error> {
+pub fn validate_root_directory_exists(root_path: &path::Path) -> Result<(), anyhow::Error> {
     if root_path.exists() && root_path.is_dir() {
         Ok(())
     } else {
-        eprintln!(
-            "{}",
-            get_error_msg(&format!(
-                "The specified path does not exist or is not a directory: {}",
-                root_path.display().bright_blue()
-            ))
-        );
-        std::process::exit(2);
+        Err(anyhow::anyhow!(get_error_msg(&format!(
+            "The specified path does not exist or is not a directory: {}",
+            root_path.display().bright_red()
+        ))))
     }
 }
 
 /// Validate that the specified file exists.
-pub fn validate_file_exists(filepath: &path::Path) -> Result<(), std::io::Error> {
+pub fn validate_file_exists(filepath: &path::Path) -> Result<(), anyhow::Error> {
     let cwd = std::env::current_dir().unwrap_or_else(|_| path::PathBuf::from("."));
 
     if filepath.exists() {
         Ok(())
     } else {
-        eprintln!(
-            "{}",
-            get_error_msg(&format!(
-                "'{}' does not exist at: {}",
-                filepath.display().bright_blue(),
-                cwd.join(filepath).display().bright_blue()
-            ))
-        );
-        std::process::exit(2);
+        Err(anyhow::anyhow!(get_error_msg(&format!(
+            "The required file '{}' does not exist at: {}",
+            filepath.display().bright_red(),
+            cwd.join(filepath).display().bright_red()
+        ))))
     }
 }
 
-// Methods for handling `uv lock --upgrade`
+// uv methods
 
 /// Check `uv` command availability.
-pub fn check_uv_command() -> Result<(), std::io::Error> {
+pub fn check_uv_command() -> Result<(), anyhow::Error> {
     match std::process::Command::new("uv").arg("--version").output() {
         Ok(_) => Ok(()),
-        Err(e) => {
-            eprintln!(
-                "{}",
-                get_error_msg(&format!(
-                    "Failed to execute '{}'. Ensure it is installed and available in the PATH. Error: {}",
-                    "uv".bright_green(),
-                    e.to_string().bright_red()
-                ))
-            );
-            std::process::exit(127);
-        }
+        Err(e) => Err(anyhow::anyhow!(get_error_msg(&format!(
+            "Failed to execute '{}'. Ensure it is installed and available in the PATH. Error: {}",
+            "uv".bright_red(),
+            e.to_string().bright_red()
+        )))),
     }
 }
 
 /// Run `uv lock --upgrade` command and return the output.
-pub fn run_uv_lock_upgrade(update_command: &str) -> Result<Output, std::io::Error> {
+pub fn run_uv_lock_upgrade(update_command: &str) -> Result<Output, anyhow::Error> {
     let split_command = update_command.split_whitespace().collect::<Vec<&str>>();
     let output = std::process::Command::new(split_command[0])
         .args(&split_command[1..])
         .output()
-        .with_context(|| {
-            get_error_msg(&format!(
-                "Failed to execute: '{}'",
-                update_command.bright_green()
-            ))
-        })
-        .unwrap_or_else(|e| {
-            eprintln!(
-                "{}",
-                get_error_msg(&format!(
-                    "Failed to update dependencies using '{}'. Error: {}",
-                    update_command.bright_green(),
-                    e.to_string().bright_red()
-                ))
-            );
-            std::process::exit(126);
-        });
+        .map_err(|e| {
+            anyhow::anyhow!(get_error_msg(&format!(
+                "Failed to execute '{}'. Error: {}",
+                update_command.bright_red(),
+                e.to_string().bright_red()
+            )))
+        })?;
 
     if !output.status.success() {
-        eprintln!(
-            "{}",
-            get_error_msg(&format!(
-                "'{}' command failed with exit code: {}",
-                update_command.bright_green(),
-                output.status.code().unwrap_or(-1).to_string().bright_red()
-            ))
-        );
-        std::process::exit(1);
+        return Err(anyhow::anyhow!(get_error_msg(&format!(
+            "'{}' command failed with exit code: {}",
+            update_command.bright_red(),
+            output.status.code().unwrap_or(-1).to_string().bright_red()
+        ))));
     }
 
     Ok(output)
@@ -185,65 +210,10 @@ pub fn print_uv_modified_dependencies(
     }
 }
 
-// Dependencies
+// Dependency parsing methods
 
-/// A struct representing a dependency as read from `pyproject.toml`.
-#[derive(Debug, Clone)]
-pub struct PyprojectDependency {
-    /// The name of the dependency as written by the user.
-    pub name: String,
-    /// The normalised name of the dependency (per PEP 503).
-    pub normalised_name: String,
-    /// The version of the dependency, if any.
-    pub version: Option<String>,
-    /// The operator of the dependency, if any (">=", "==", "~=", etc.).
-    pub operator: Option<String>,
-    /// The suffix of the dependency, if any (",<1.0" or ",!=1.0.0").
-    pub suffix: Option<String>,
-    /// The group of the dependency, if any.
-    pub group: Option<String>,
-}
-
-/// A struct representing a dependency as read from `uv.lock`.
-#[derive(Debug, Clone)]
-pub struct LockDependency {
-    /// The name of the dependency as written by uv.
-    pub name: String,
-    /// The normalised name of the dependency (per PEP 503).
-    pub normalised_name: String,
-    /// The version of the dependency.
-    pub version: String,
-}
-
-/// A struct representing a dependency that has been mapped from `pyproject.toml` to `uv.lock`.
-#[derive(Debug, Clone)]
-pub struct MappedDependency {
-    /// The dependency as read from pyproject.toml.
-    pub pyproject: PyprojectDependency,
-    /// The dependency as read from uv.lock.
-    pub lock: LockDependency,
-}
-
-/// A struct representing a change in a dependency's version.
-#[derive(Debug, Clone)]
-pub struct DependencyChange {
-    /// The name of the dependency.
-    pub name: String,
-    /// The operator of the dependency, if any (">=", "==", "~=", etc.).
-    pub operator: Option<String>,
-    /// The old version number of the dependency.
-    pub old: String,
-    /// The new version number of the dependency.
-    pub new: String,
-    /// The suffix of the dependency, if any (",<1.0" or ",!=1.0.0").
-    pub suffix: Option<String>,
-}
-
-// Dependency parsing
-
-/// Normalise a package name per PEP 503:
-/// lowercase and collapse runs of [-_.] into a single '-'.
-pub fn normalize_name(name: &str) -> String {
+/// Normalise a package name per PEP 503.
+pub fn normalise_dependency_name(name: &str) -> String {
     let lower = name.to_lowercase();
     // Replace any run of [-_.] with a single '-'
     let mut result = String::with_capacity(lower.len());
@@ -262,12 +232,14 @@ pub fn normalize_name(name: &str) -> String {
     result
 }
 
-/// Normalise a version string by stripping trailing `.0` components
-fn normalize_version(version: &str) -> String {
+/// Normalise a version string by stripping trailing `.0` components.
+fn normalise_dependency_version(version: &str) -> String {
     let parts: Vec<&str> = version.split('.').collect();
     let trimmed = parts.iter().rev().skip_while(|&&p| p == "0").count();
     parts[..trimmed.max(1)].join(".")
 }
+
+// Compute changes methods
 
 /// Map dependencies from pyproject.toml to uv.lock based on their normalised names.
 pub fn map_dependencies(
@@ -299,7 +271,9 @@ pub fn compute_dependency_changes(mapped_deps: &[MappedDependency]) -> Vec<Depen
         if let Some(pyproject_version) = &mapped.pyproject.version {
             let lock_version = &mapped.lock.version;
 
-            if normalize_version(pyproject_version) != normalize_version(lock_version) {
+            if normalise_dependency_version(pyproject_version)
+                != normalise_dependency_version(lock_version)
+            {
                 changes.push(DependencyChange {
                     name: mapped.pyproject.name.clone(),
                     operator: mapped.pyproject.operator.clone(),
@@ -314,30 +288,201 @@ pub fn compute_dependency_changes(mapped_deps: &[MappedDependency]) -> Vec<Depen
     changes
 }
 
+/// Print the differences between the old and new versions of dependencies.
+pub fn print_diff(changes: &[DependencyChange]) {
+    for change in changes {
+        println!(
+            "{} {:<16} {}{}{}",
+            "-".bright_red(),
+            change.name.bold(),
+            change.operator.clone().unwrap_or_default().bright_red(),
+            change.old.bright_red().underline(),
+            change.suffix.clone().unwrap_or_default().bright_red(),
+        );
+        println!(
+            "{} {:<16} {}{}{}",
+            "+".bright_green(),
+            change.name.bold(),
+            change.operator.clone().unwrap_or_default().bright_green(),
+            change.new.bright_green().underline(),
+            change.suffix.clone().unwrap_or_default().bright_green()
+        );
+        println!();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::os::unix::process::ExitStatusExt;
 
-    // ── normalize_name ───────────────────────────────────────────────────────
+    // General methods
 
     #[test]
-    fn test_normalize_basic() {
-        assert_eq!(normalize_name("requests"), "requests");
+    fn test_get_success_msg() {
+        let msg = "Operation successful";
+        let result = get_success_msg(msg);
+        assert!(result.contains(msg));
     }
 
     #[test]
-    fn test_normalize_underscores() {
-        assert_eq!(normalize_name("my_package"), "my-package");
+    fn test_get_warning_msg() {
+        let msg = "This is a warning";
+        let result = get_warning_msg(msg);
+        assert!(result.contains(msg));
     }
 
     #[test]
-    fn test_normalize_dots_and_dashes() {
-        assert_eq!(normalize_name("My.Cool-Package"), "my-cool-package");
+    fn test_get_error_msg() {
+        let msg = "An error occurred";
+        let result = get_error_msg(msg);
+        assert!(result.contains(msg));
     }
 
     #[test]
-    fn test_normalize_consecutive_separators() {
-        // PEP 503: runs of [-_.] collapse to a single '-'
-        assert_eq!(normalize_name("weird___name"), "weird-name");
+    fn test_validate_root_directory_exists() {
+        let path = std::env::current_dir().unwrap();
+        assert!(validate_root_directory_exists(&path).is_ok());
+    }
+
+    #[test]
+    fn test_validate_root_directory_not_exists() {
+        let path = std::path::Path::new("non_existent_directory");
+        assert!(validate_root_directory_exists(&path).is_err());
+    }
+
+    #[test]
+    fn test_validate_file_exists() {
+        let path = std::env::current_exe().unwrap();
+        assert!(validate_file_exists(&path).is_ok());
+    }
+
+    #[test]
+    fn test_validate_file_not_exists() {
+        let path = std::path::Path::new("non_existent_file.txt");
+        assert!(validate_file_exists(&path).is_err());
+    }
+
+    // uv methods
+
+    #[test]
+    fn test_parse_uv_update_output() {
+        let output = Output {
+            status: std::process::ExitStatus::from_raw(0),
+            stdout: Vec::new(),
+            stderr: b"Updated package1\nAdded package2\nRemoved package3\n".to_vec(),
+        };
+
+        let (updated, added, removed) = parse_uv_update_output(&output);
+        assert_eq!(updated, vec!["package1"]);
+        assert_eq!(added, vec!["package2"]);
+        assert_eq!(removed, vec!["package3"]);
+    }
+
+    #[test]
+    fn test_print_uv_modified_dependencies() {
+        let updated = vec!["package1".to_string()];
+        let added = vec!["package2".to_string()];
+        let removed = vec!["package3".to_string()];
+
+        print_uv_modified_dependencies(updated, added, removed, true);
+    }
+
+    // Dependency parsing methods
+
+    #[test]
+    fn test_normalise_dependency_name() {
+        assert_eq!(normalise_dependency_name("requests"), "requests");
+        assert_eq!(normalise_dependency_name("my_package"), "my-package");
+        assert_eq!(
+            normalise_dependency_name("My.Cool-Package"),
+            "my-cool-package"
+        );
+        assert_eq!(normalise_dependency_name("weird___name"), "weird-name");
+    }
+
+    #[test]
+    fn test_normalise_dependency_version() {
+        assert_eq!(normalise_dependency_version("1.0.0"), "1");
+        assert_eq!(normalise_dependency_version("1.2.0"), "1.2");
+        assert_eq!(normalise_dependency_version("1.2.3"), "1.2.3");
+    }
+
+    // Compute changes methods
+
+    const PKG1_NAME: &str = "package1";
+    const PKG1_VERSION: &str = "1.0.0";
+
+    const PKG2_NAME: &str = "package2";
+    const PKG2_VERSION: &str = "2.0.0";
+    const PKG2_LOCK_VERSION: &str = "2.1.0";
+
+    const OPERATOR: &str = "==";
+
+    fn mock_pyproject_deps() -> Vec<PyprojectDependency> {
+        vec![
+            PyprojectDependency {
+                name: PKG1_NAME.to_string(),
+                normalised_name: PKG1_NAME.to_string(),
+                version: Some(PKG1_VERSION.to_string()),
+                operator: Some(OPERATOR.to_string()),
+                suffix: None,
+                group: None,
+            },
+            PyprojectDependency {
+                name: PKG2_NAME.to_string(),
+                normalised_name: PKG2_NAME.to_string(),
+                version: Some(PKG2_VERSION.to_string()),
+                operator: Some(OPERATOR.to_string()),
+                suffix: None,
+                group: None,
+            },
+        ]
+    }
+
+    fn mock_lock_deps() -> Vec<LockDependency> {
+        vec![
+            LockDependency {
+                name: PKG1_NAME.to_string(),
+                normalised_name: PKG1_NAME.to_string(),
+                version: PKG1_VERSION.to_string(),
+            },
+            LockDependency {
+                name: PKG2_NAME.to_string(),
+                normalised_name: PKG2_NAME.to_string(),
+                version: PKG2_LOCK_VERSION.to_string(),
+            },
+        ]
+    }
+    #[test]
+    fn test_map_dependencies() {
+        let mapped = map_dependencies(&mock_pyproject_deps(), &mock_lock_deps());
+        assert_eq!(mapped.len(), 2);
+        assert_eq!(mapped[0].pyproject.name, PKG1_NAME);
+        assert_eq!(mapped[0].lock.version, PKG1_VERSION);
+        assert_eq!(mapped[1].pyproject.name, PKG2_NAME);
+        assert_eq!(mapped[1].lock.version, PKG2_LOCK_VERSION);
+    }
+
+    #[test]
+    fn test_compute_dependency_changes() {
+        let mapped = map_dependencies(&mock_pyproject_deps(), &mock_lock_deps());
+        let changes = compute_dependency_changes(&mapped);
+        assert_eq!(changes.len(), 1);
+        assert_eq!(changes[0].name, PKG2_NAME);
+        assert_eq!(changes[0].old, PKG2_VERSION);
+        assert_eq!(changes[0].new, PKG2_LOCK_VERSION);
+    }
+
+    #[test]
+    fn test_print_diff() {
+        let changes = vec![DependencyChange {
+            name: PKG2_NAME.to_string(),
+            operator: Some(OPERATOR.to_string()),
+            old: PKG2_VERSION.to_string(),
+            new: PKG2_LOCK_VERSION.to_string(),
+            suffix: None,
+        }];
+        print_diff(&changes);
     }
 }

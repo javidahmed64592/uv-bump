@@ -1,22 +1,20 @@
 //! Align `pyproject.toml` dependency constraints with versions resolved by `uv`
 
 mod cli;
-mod diff;
 mod lockfile;
 mod pyproject;
 
 use cli::{parse_cli_args, validate_conflicting_flags};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use crossterm::terminal;
-use diff::print_diff;
 use lockfile::read_lock_versions;
 use owo_colors::OwoColorize;
 use pyproject::{apply_changes, read_dependencies};
 use std::path::Path;
 use uv_align::{
     check_uv_command, compute_dependency_changes, get_success_msg, get_warning_msg,
-    map_dependencies, parse_uv_update_output, print_uv_modified_dependencies, run_uv_lock_upgrade,
-    validate_file_exists, validate_root_directory_exists,
+    map_dependencies, parse_uv_update_output, print_diff, print_uv_modified_dependencies,
+    run_uv_lock_upgrade, validate_file_exists, validate_root_directory_exists,
 };
 
 const PYPROJECT_FILENAME: &str = "pyproject.toml";
@@ -26,17 +24,31 @@ const UPDATE_COMMAND: &str = "uv lock --upgrade";
 fn main() -> anyhow::Result<()> {
     // Get CLI arguments
     let cli = parse_cli_args();
-    validate_conflicting_flags(cli.check, cli.yes, "--check", "-y / --yes")?;
+
+    if let Err(error) = validate_conflicting_flags(cli.check, cli.yes, "--check", "-y / --yes") {
+        eprintln!("{}", error);
+        std::process::exit(2);
+    }
 
     // Validate the root directory and required files
-    validate_root_directory_exists(&cli.path)?;
+    if let Err(error) = validate_root_directory_exists(&cli.path) {
+        eprintln!("{}", error);
+        std::process::exit(2);
+    }
     std::env::set_current_dir(&cli.path)?;
 
     let pyproject_path = Path::new(PYPROJECT_FILENAME);
     let lockfile_path = Path::new(LOCKFILE_FILENAME);
 
-    validate_file_exists(pyproject_path)?;
-    validate_file_exists(lockfile_path)?;
+    if let Err(error) = validate_file_exists(pyproject_path) {
+        eprintln!("{}", error);
+        std::process::exit(2);
+    }
+
+    if let Err(error) = validate_file_exists(lockfile_path) {
+        eprintln!("{}", error);
+        std::process::exit(2);
+    }
 
     // Upgrade dependencies in `uv.lock` if the upgrade flag is set
     if cli.upgrade {
@@ -46,10 +58,21 @@ fn main() -> anyhow::Result<()> {
             UPDATE_COMMAND.bright_green()
         );
 
-        check_uv_command()?;
-        let output = run_uv_lock_upgrade(UPDATE_COMMAND)?;
-        let (updated, added, removed) = parse_uv_update_output(&output);
-        print_uv_modified_dependencies(updated, added, removed, cli.verbose);
+        if let Err(error) = check_uv_command() {
+            eprintln!("{}", error);
+            std::process::exit(127);
+        }
+
+        match run_uv_lock_upgrade(UPDATE_COMMAND) {
+            Ok(output) => {
+                let (updated, added, removed) = parse_uv_update_output(&output);
+                print_uv_modified_dependencies(updated, added, removed, cli.verbose);
+            }
+            Err(error) => {
+                eprintln!("{}", error);
+                std::process::exit(126);
+            }
+        }
     }
 
     // Compute and print the diff of dependency changes

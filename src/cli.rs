@@ -1,4 +1,4 @@
-//! Command-line interface for uv-align
+//! Command-line interface for the tool
 
 use std::path::PathBuf;
 
@@ -41,6 +41,7 @@ pub struct CliArgs {
     pub verbose: bool,
 }
 
+/// Parse command-line arguments and return a `CliArgs` struct
 pub fn parse_cli_args() -> CliArgs {
     let cli = Cli::parse();
     CliArgs {
@@ -52,6 +53,7 @@ pub fn parse_cli_args() -> CliArgs {
     }
 }
 
+/// Validate that two flags are not used together
 pub fn validate_conflicting_flags(
     flag_1: bool,
     flag_2: bool,
@@ -59,15 +61,28 @@ pub fn validate_conflicting_flags(
     flag_2_name: &str,
 ) -> anyhow::Result<()> {
     if flag_1 && flag_2 {
-        eprintln!(
-            "{}",
-            get_error_msg(&format!(
-                "The '{}' and '{}' flags cannot be used together.",
-                flag_1_name.bright_green(),
-                flag_2_name.bright_green()
-            ))
-        );
-        std::process::exit(2);
+        return Err(anyhow::anyhow!(get_error_msg(&format!(
+            "The '{}' and '{}' flags cannot be used together.",
+            flag_1_name.bright_red(),
+            flag_2_name.bright_red()
+        ))));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_validate_conflicting_flags() {
+        let result = validate_conflicting_flags(true, true, "flag1", "flag2");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_non_conflicting_flags() {
+        let result = validate_conflicting_flags(true, false, "flag1", "flag2");
+        assert!(result.is_ok());
+    }
 }
