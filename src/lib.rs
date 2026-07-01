@@ -179,34 +179,55 @@ pub fn print_uv_modified_dependencies(
     } else {
         let mut parts = Vec::new();
         if updated_count > 0 {
-            parts.push(format!("{} updated", updated_count.to_string().bold()));
+            parts.push(format!(
+                "{} updated",
+                updated_count.to_string().bright_yellow()
+            ));
         }
+
         if added_count > 0 {
-            parts.push(format!("{} added", added_count.to_string().bold()));
+            parts.push(format!("{} added", added_count.to_string().bright_green()));
         }
+
         if removed_count > 0 {
-            parts.push(format!("{} removed", removed_count.to_string().bold()));
+            parts.push(format!(
+                "{} removed",
+                removed_count.to_string().bright_red()
+            ));
         }
+
+        if verbose {
+            println!();
+
+            if updated_count > 0 {
+                println!("Updated:");
+                for dep in updated {
+                    println!("  {} {}", "~".bright_yellow(), dep);
+                }
+                println!();
+            }
+
+            if added_count > 0 {
+                println!("Added:");
+                for dep in added {
+                    println!("  {} {}", "+".bright_green(), dep);
+                }
+                println!();
+            }
+
+            if removed_count > 0 {
+                println!("Removed:");
+                for dep in removed {
+                    println!("  {} {}", "-".bright_red(), dep);
+                }
+                println!();
+            }
+        }
+
         println!(
             "{}",
             get_success_msg(&format!("Dependencies: {}!\n", parts.join(", ")))
         );
-
-        if verbose {
-            println!("Updated dependencies:");
-            for dep in updated {
-                println!("  {} {}", "~".bright_yellow().bold(), dep);
-            }
-            println!("Added dependencies:");
-            for dep in added {
-                println!("  {} {}", "+".bright_green().bold(), dep);
-            }
-            println!("Removed dependencies:");
-            for dep in removed {
-                println!("  {} {}", "-".bright_red().bold(), dep);
-            }
-            println!();
-        }
     }
 }
 
@@ -294,7 +315,7 @@ pub fn print_diff(changes: &[DependencyChange]) {
         println!(
             "{} {:<16} {}{}{}",
             "-".bright_red(),
-            change.name.bold(),
+            change.name,
             change.operator.clone().unwrap_or_default().bright_red(),
             change.old.bright_red().underline(),
             change.suffix.clone().unwrap_or_default().bright_red(),
@@ -302,7 +323,7 @@ pub fn print_diff(changes: &[DependencyChange]) {
         println!(
             "{} {:<16} {}{}{}",
             "+".bright_green(),
-            change.name.bold(),
+            change.name,
             change.operator.clone().unwrap_or_default().bright_green(),
             change.new.bright_green().underline(),
             change.suffix.clone().unwrap_or_default().bright_green()
