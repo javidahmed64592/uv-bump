@@ -86,15 +86,15 @@ fn main() -> anyhow::Result<()> {
         println!("{}", get_warning_msg("Dependencies are already in sync!"));
         return Ok(());
     } else {
-        println!("{}", "Changes:\n".bold().underline());
+        println!("{}", "Changes:\n".underline());
         print_diff(&diff);
         println!(
-            "{} {} out of sync in: {}",
-            diff.len().to_string().bold(),
+            "{}{} out of sync in: {}",
+            diff.len().to_string().bright_red(),
             if diff.len() == 1 {
-                "dependency is"
+                format!("{} is", " dependency".bright_red())
             } else {
-                "dependencies are"
+                format!("{} are", " dependencies".bright_red())
             },
             PYPROJECT_FILENAME.bright_blue()
         );
@@ -130,9 +130,9 @@ fn main() -> anyhow::Result<()> {
         terminal::disable_raw_mode()?;
 
         if confirmed {
-            println!("{}", "y".bold());
+            println!("y");
         } else {
-            println!("{}", "N".bold());
+            println!("N");
             println!("{}", get_warning_msg("Aborting changes..."));
             return Ok(());
         }

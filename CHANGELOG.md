@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Update output formatting for better readability and clarity.
 - Added unit tests and docstrings across codebase.
 - Updated documentation links.
 
